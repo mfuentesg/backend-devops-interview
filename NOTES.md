@@ -39,6 +39,9 @@ I'll use this document to cover two things:
   real env vars still win. README updated with the table and the `docker compose` quickstart.
 * Rotated `SECRET_KEY`. The old one was committed, so it's burned. The default now is a
   fresh insecure dev key, clearly marked, and any real deployment sets its own.
+* `ruff` moved to `mise.toml`, pinned, instead of a `uv` dev dependency. It's a standalone
+  binary and doesn't need the venv, and pinning means every machine and CI lint the same.
+  Also excluded generated migrations from lint, so `ruff check .` is clean.
 * `seed.py`: comment bodies come from a 10k pool instead of calling Faker per row, like
   posts already do for title and body. Those Faker calls were most of the loop.
 * `seed.py`: precompute the cumulative weights once and draw a full batch per call (`k=n`),
@@ -69,7 +72,9 @@ I'll use this document to cover two things:
 
 ## What I'd do next
 
-* Commit the GitHub Actions workflow (lint + smoke tests).
+* Commit the GitHub Actions workflow (`ruff check`, `ruff format --check`, pytest).
+* Adopt `ruff format` repo-wide, 5 files currently diverge. Left it out for now to keep
+  this diff focused.
 * `DEBUG` and `ALLOWED_HOSTS` to env as well, then the `DEBUG=False` security block
   (SSL redirect, secure cookies, HSTS, `CSRF_TRUSTED_ORIGINS`) with the deploy work.
 * A production server (gunicorn or uvicorn) and a multi-stage `Dockerfile`, then k8s

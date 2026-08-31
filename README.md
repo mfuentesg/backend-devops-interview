@@ -6,7 +6,7 @@ A small content service: users, posts, comments, tags. Django + Ninja + Postgres
 
 Prereqs:
 
-- [mise](https://mise.jdx.dev/) — manages the Python toolchain and uv.
+- [mise](https://mise.jdx.dev/) — manages the Python toolchain, uv and ruff.
 - [Docker](https://docs.docker.com/get-docker/) with Compose — runs Postgres and pgAdmin.
 
 Steps:
@@ -23,6 +23,13 @@ uv run python manage.py runserver
 
 API docs at <http://localhost:8000/api/docs>. pgAdmin at <http://localhost:8080>
 (`admin@example.com` / `postgres`), already connected to the local database.
+
+Lint and tests:
+
+```sh
+ruff check .
+uv run pytest
+```
 
 ### Configuration
 
