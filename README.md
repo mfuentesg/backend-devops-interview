@@ -7,20 +7,45 @@ A small content service: users, posts, comments, tags. Django + Ninja + Postgres
 Prereqs:
 
 - [mise](https://mise.jdx.dev/) — manages the Python toolchain and uv.
-- A running PostgreSQL 16 instance on `localhost:5432` with a database called `backend_devops_interview` accessible to `postgres`/`postgres`. (Local install, `brew install postgresql@16`, host-mode docker, whatever you have.)
+- [Docker](https://docs.docker.com/get-docker/) with Compose — runs Postgres and pgAdmin.
 
 Steps:
 
 ```sh
 mise install
 uv sync
-createdb backend_devops_interview        # or however you create it
+cp .env.example .env                     # database config; defaults match docker-compose
+docker compose up -d                     # Postgres on :5432, pgAdmin on :8080
 uv run python manage.py migrate
 uv run python manage.py seed
 uv run python manage.py runserver
 ```
 
-API docs at <http://localhost:8000/api/docs>.
+API docs at <http://localhost:8000/api/docs>. pgAdmin at <http://localhost:8080>
+(`admin@example.com` / `postgres`), already connected to the local database.
+
+### Configuration
+
+`core/settings.py` reads its config from environment variables via `django-environ`,
+loading a local `.env` file if one is present. Defaults match the `docker-compose.yml`
+setup, so `.env` is optional for local work.
+
+`.env` is git-ignored and never committed — it's your machine's copy. `.env.example` is
+the tracked template; copy it (`cp .env.example .env`) and edit as needed.
+
+| Variable            | Default                    |
+| ------------------- | -------------------------- |
+| `SECRET_KEY`        | an insecure dev key        |
+| `LANGUAGE_CODE`     | `en-us`                    |
+| `TIME_ZONE`         | `America/Santiago`         |
+| `POSTGRES_DB`       | `backend_devops_interview` |
+| `POSTGRES_USER`     | `postgres`                 |
+| `POSTGRES_PASSWORD` | `postgres`                 |
+| `POSTGRES_HOST`     | `localhost`                |
+| `POSTGRES_PORT`     | `5432`                     |
+
+Any real deployment must set its own `SECRET_KEY` (generate one with
+`uv run python -c "from django.core.management.utils import get_random_secret_key as g; print(g())"`).
 
 Seeding writes ~100k posts and ~500k comments. Expect a few minutes.
 

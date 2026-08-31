@@ -1,46 +1,77 @@
 # Fintual Interview - Logbook
 
-I'll write this document to cover two things.
+I'll use this document to cover two things:
 
-1. Use it as context for the Agent I will use (Claude)
-2. Detail all the stuff I believe that should be considered, implemented or fixed.
+1. Use it as context for the agent I'm working with (Claude).
+2. Keep track of everything I found, changed, or still consider worth doing.
 
-I would like to cover some important aspects to me:
+## Aspects that matter to me here
 
-* Developer experience: Giving a proper environment to other developers making its work easier.
-* Documentation: Include as much details as possible, to avoid black boxes that nobody could understand in future development sessions
-* Automation: Keep some handy commands to cover complex setups, including pipeline validations like linting or testing
-* Agents: Prepare as much as possible this repo to give sufficient information for working with agents on any harness.
-* Leave it better condition that you found it
+* Developer experience: giving a proper environment to other developers, making their work easier.
+* Documentation: writing down as much as I can, so there are no black boxes for a future session.
+* Automation: handy commands for the complex setups, including pipeline checks like linting and testing.
+* Agents: preparing the repo so any agent harness has enough context to work with.
+* Leave it in better condition than I found it.
+
+## What I found
+
+* Getting this running on a fresh laptop is harder than it should be: install PostgreSQL 16
+  by hand, create the database yourself, bring `mise` and `uv`. Nothing is containerized.
+* `seed.py` is slow, around 15-25 minutes. I gave the existing code a try, but after two
+  minutes I preferred to fix it, nobody has the patience to wait that long just to get
+  data in the db. Three things were hurting:
+  1. `fake.sentence()` is called once per row, and there are 500k comments.
+  2. `random.choices(weights=...)` rebuilds a 100k-element weight list on every call, ~600k times.
+  3. The comments loop runs outside a transaction, so it's 500 separate autocommits.
+* `seed.py` `handle()` is one long function, everything inline. Only a readability thing.
+* `core/settings.py` had everything hardcoded: the DB connection, and a real `SECRET_KEY`
+  committed to the repo. No way to change either per environment without editing the file.
+
+## What I fixed and why
+
+* Added `docker-compose.yml` for the database: `postgres:18.6-alpine` with a persistent
+  volume and the db created on boot, plus `pgadmin` on `:8080` already wired through Docker
+  `configs`. One command replaces the "install Postgres yourself" step.
+* `core/settings.py` reads its config from env vars via `django-environ`: `SECRET_KEY`,
+  `LANGUAGE_CODE`, `TIME_ZONE`, and the DB connection (`POSTGRES_DB`, `POSTGRES_USER`,
+  `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`). Old values stay as defaults, so
+  nothing breaks without a `.env`. Added `.env.example`; a local `.env` is read if present,
+  real env vars still win. README updated with the table and the `docker compose` quickstart.
+* Rotated `SECRET_KEY`. The old one was committed, so it's burned. The default now is a
+  fresh insecure dev key, clearly marked, and any real deployment sets its own.
+* `seed.py`: comment bodies come from a 10k pool instead of calling Faker per row, like
+  posts already do for title and body. Those Faker calls were most of the loop.
+* `seed.py`: precompute the cumulative weights once and draw a full batch per call (`k=n`),
+  instead of `random.choices` rebuilding them every time. Removes ~600k O(n) passes.
+* `seed.py`: wrapped the comments loop in a single `transaction.atomic()`, like the posts
+  loop already is. 500 autocommits become 1.
+* Seed goes from ~15-25 min to ~2 min. RNG stream changes, so rows differ but stay
+  deterministic under `seed(42)`.
 
 ## Self taste
 
-* I'll use (skaffold)[https://github.com/GoogleContainerTools/skaffold] for local k8s development with autoreload support on code change, and other stuff. I have considered `docker compose` for this, but skaffold helps to have native k8s manifests and easy access to k8s workload.
-* [kind](https://github.com/kubernetes-sigs/kind) for creating k8s nodes as docker containers
-* Docker as container runtime
-* Will include grafana for visualizing data using prometheus source, prometheus for collecting metrics and loki for logging
-* [ruff](https://github.com/astral-sh/ruff) for linting
-* Github actions for CI
-* Claude as AI harness
+* Docker Compose for local development, but only for Postgres and pgAdmin. One command, no
+  cluster to manage. I considered skaffold + kind for native k8s manifests with autoreload,
+  but I don't think it's needed at this moment. Maybe for a future iteration.
+* `mise`, `uv` and the app run on the host, not in a container. Editor autocomplete and
+  imports need the deps local, and the host disk beats a container bind mount (more on
+  macOS). The app still needs an image for production, that's a separate concern.
+* ruff for linting.
+* Github Actions for CI, running lint and the smoke tests. Not committed yet.
+* Claude as the AI harness.
 
-## Code analysis
+## Things I'll keep out
 
-* blog/management/commands/seed.py
-- `handle()` is one long function; could be split into per-entity steps (users / tags / posts / comments).
-- Performance: the FK ordering (users -> tags -> posts -> post_tags -> comments) is inherent and cheap
-  (parent IDs are already in memory before child inserts). The real bottlenecks were:
-  1. `fake.sentence()` called per row for 500k comments -> now drawn from a 10k `comment_pool`,
-     like posts already do for title/body.
-  2. `random.choices(..., weights=...)` was re-accumulating a 100k-element weight list on every
-     single draw (~600k calls) -> precompute `cum_weights` once and draw a full batch per call (`k=n`).
-  3. Comments loop had no surrounding transaction (500 autocommits) -> wrapped in one
-     `transaction.atomic()`, matching the posts loop.
-- Estimated effect: ~15-25 min -> ~2 min, roughly 10-15x; almost all of it is item 2.
-  RNG stream changes, so the seeded rows differ but stay deterministic under `seed(42)`.
-- Not done: `COPY`-based bulk load (would shave the final ~1-2 min to ~30s but is a real rewrite
-  away from the Django idiom), and splitting `handle()`.
+* Helm charts. Not too complex, but I don't think it's required right now, maybe later.
+* Tracing tools. I consider this is too much for this project.
+* `COPY`-based bulk load and splitting `handle()` in the seeder. Real rewrites for the last
+  minute or so of seed time.
 
-## Things I will keep out
+## What I'd do next
 
-* Helm charts, is not too complex, but I don't is required at this moment, maybe for future improvements.
-* Tracing tools, I consider this is too much for this project
+* Commit the GitHub Actions workflow (lint + smoke tests).
+* `DEBUG` and `ALLOWED_HOSTS` to env as well, then the `DEBUG=False` security block
+  (SSL redirect, secure cookies, HSTS, `CSRF_TRUSTED_ORIGINS`) with the deploy work.
+* A production server (gunicorn or uvicorn) and a multi-stage `Dockerfile`, then k8s
+  manifests or an ECS task definition.
+* Observability: Prometheus metrics endpoint, Grafana dashboards, Loki for the logs.
