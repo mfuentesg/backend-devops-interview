@@ -1,8 +1,26 @@
 from pathlib import Path
 
+import environ
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "django-insecure-9!^p2zr8m=k$d3v0&xq+1wybho4ag&7lcfu+ej(nti6r%h@m4s"
+env = environ.Env(
+    # Insecure dev-only default. Set a real SECRET_KEY in the environment for
+    # any deployment; the previous checked-in key has been rotated out.
+    SECRET_KEY=(str, "django-insecure-unsecure"),
+    LANGUAGE_CODE=(str, "en-us"),
+    TIME_ZONE=(str, "America/Santiago"),
+    POSTGRES_DB=(str, "backend_devops_interview"),
+    POSTGRES_USER=(str, "postgres"),
+    POSTGRES_PASSWORD=(str, "postgres"),
+    POSTGRES_HOST=(str, "localhost"),
+    POSTGRES_PORT=(str, "5432"),
+)
+# Read a local .env file if present. Real environment variables always win,
+# so this is a no-op in CI and production.
+environ.Env.read_env(BASE_DIR / ".env")
+
+SECRET_KEY = env("SECRET_KEY")
 
 DEBUG = True
 
@@ -53,11 +71,11 @@ WSGI_APPLICATION = "core.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "backend_devops_interview",
-        "USER": "postgres",
-        "PASSWORD": "postgres",
-        "HOST": "localhost",
-        "PORT": "5432",
+        "NAME": env("POSTGRES_DB"),
+        "USER": env("POSTGRES_USER"),
+        "PASSWORD": env("POSTGRES_PASSWORD"),
+        "HOST": env("POSTGRES_HOST"),
+        "PORT": env("POSTGRES_PORT"),
     }
 }
 
@@ -70,8 +88,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 
-LANGUAGE_CODE = "en-us"
-TIME_ZONE = "America/Santiago"
+LANGUAGE_CODE = env("LANGUAGE_CODE")
+TIME_ZONE = env("TIME_ZONE")
 USE_I18N = True
 USE_TZ = True
 
