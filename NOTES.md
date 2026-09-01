@@ -50,6 +50,11 @@ I'll use this document to cover two things:
   loop already is. 500 autocommits become 1.
 * Seed goes from ~15-25 min to ~2 min. RNG stream changes, so rows differ but stay
   deterministic under `seed(42)`.
+* Added `.github/workflows/ci.yml`: one `lint-test` job on push to `main` and on PRs,
+  running `ruff check` and `pytest`. `jdx/mise-action` installs python, uv and ruff from
+  `mise.toml`, so CI and local run the exact same pinned tools; uv venv is cached on
+  `uv.lock`. A `build-and-push` job (GHCR image) is scaffolded but commented out until
+  there's a `Dockerfile`.
 
 ## Self taste
 
@@ -60,7 +65,7 @@ I'll use this document to cover two things:
   imports need the deps local, and the host disk beats a container bind mount (more on
   macOS). The app still needs an image for production, that's a separate concern.
 * ruff for linting.
-* Github Actions for CI, running lint and the smoke tests. Not committed yet.
+* Github Actions for CI, running lint and the smoke tests, tools installed via `mise`.
 * Claude as the AI harness.
 
 ## Things I'll keep out
@@ -72,9 +77,9 @@ I'll use this document to cover two things:
 
 ## What I'd do next
 
-* Commit the GitHub Actions workflow (`ruff check`, `ruff format --check`, pytest).
-* Adopt `ruff format` repo-wide, 5 files currently diverge. Left it out for now to keep
-  this diff focused.
+* Adopt `ruff format` repo-wide, 5 files currently diverge, then add a
+  `ruff format --check` gate to CI. Left the format pass out for now to keep this
+  diff focused.
 * `DEBUG` and `ALLOWED_HOSTS` to env as well, then the `DEBUG=False` security block
   (SSL redirect, secure cookies, HSTS, `CSRF_TRUSTED_ORIGINS`) with the deploy work.
 * A production server (gunicorn or uvicorn) and a multi-stage `Dockerfile`, then k8s
