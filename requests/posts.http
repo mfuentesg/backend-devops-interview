@@ -10,8 +10,11 @@ GET {{baseUrl}}/posts?published=false
 ### List posts — text search across title and body
 GET {{baseUrl}}/posts?query=django
 
-### List posts — by tag slug (unknown slug returns an empty list, still 200)
+### List posts — by tag slug (existing tag)
 GET {{baseUrl}}/posts?slug=python
+
+### List posts — by tag slug (unknown slug returns an empty list, still 200)
+GET {{baseUrl}}/posts?slug=does-not-exist
 
 ### List posts — oldest first
 GET {{baseUrl}}/posts?sort=asc

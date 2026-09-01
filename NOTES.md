@@ -63,7 +63,7 @@ I'll use this document to cover two things:
 * `blog/api.py` split into a `blog/api/` package: `posts`, `comments`, `users`, plus
   `responses.py` (envelope builder) and `helpers.py` (exception handlers, pagination,
   shared serializers). One file per entity, thin views, no service layer yet.
-* Every endpoint now returns `{data, meta, status_code, errors}`. Ninja `ValidationError`
+* Every routed API endpoint returns `{data, meta, status_code, errors}`. Ninja `ValidationError`
   and a small `ApiError` are reshaped into that envelope (400 / 404); `/api/docs` shows
   the wrapped shape via a generic `Envelope[T]` response schema.
 * `GET /posts` takes `published`, `sort`, `query`, `slug`, `page`, `limit` (max 100),
@@ -112,3 +112,25 @@ I'll use this document to cover two things:
 * Load testing for performance validation
 * Race-safe view_count via F("view_count") + 1. Comma-separated expand values. Full-text
   index for the query filter.
+* JSON 404/405/500 for the whole `/api/` prefix (resolver-level errors and unhandled
+  exceptions still fall through to Django's HTML pages).
+* Unknown query params on `GET /posts` are silently ignored — django-ninja filters params
+  before schema validation, so `extra="forbid"` on the filter schema does nothing (verified).
+  A stale `?q=` from the old `/posts/search` returns 200 + everything. Needs an explicit
+  allow-list check against `request.GET`.
+* `blog/api/helpers.py` is a grab-bag (serializers + `ApiError` + `paginate` + handler
+  registration) — split `ApiError` into `errors.py`, move serializers to `serializers.py`.
+* Error-item construction is duplicated (`responses._norm` vs the inline pydantic-`loc`
+  mapping in `helpers`) — fold into one `_from_pydantic` helper and harden the
+  `e["msg"]` / `e["message"]` bracket access to `.get()`.
+* `GET /users/{id}` issues two `COUNT` queries — fold into
+  `annotate(Count("posts"), Count("comments"))`.
+* Deep `OFFSET` pagination scans discarded rows — move to keyset pagination on
+  `(created_at, id)` at scale.
+* Index `(-created_at, id)`, `is_published`, and the `query` `icontains` targets —
+  currently sequential scans, run twice per request (count + page).
+* Sanitisation is write-path only — the Django admin and the seeder bypass `nh3`.
+* `paginate()` has no `page<1` / `limit<=0` guard (endpoint `Query(ge=1, le=100)` shields
+  it today).
+* Test fixtures `client` / `user` are redefined across all four test files — move to
+  `blog/tests/conftest.py`.
