@@ -23,9 +23,6 @@ from blog.schemas import (
 
 router = Router()
 
-# B008: Query(...) must not be called in an argument default; bind it once here.
-_EXPAND_QUERY = Query([])
-
 
 def _serialize_post_list(post: Post) -> dict:
     return {
@@ -52,7 +49,7 @@ def list_posts(
         qs = qs.filter(Q(title__icontains=filters.query) | Q(body__icontains=filters.query))
     if filters.slug:
         qs = qs.filter(tags__slug=filters.slug)
-    qs = qs.order_by("created_at" if filters.sort == SortOrder.asc else "-created_at")
+    qs = qs.order_by("created_at" if filters.sort == SortOrder.asc else "-created_at", "id")
 
     items, total = paginate(qs, page, limit)
     return ApiResponse.paginated(
@@ -74,8 +71,15 @@ def _serialize_post_detail(post: Post, comments: list) -> dict:
     }
 
 
-@router.get("/posts/{post_id}", response={200: Envelope[PostDetailOut], 404: Envelope[None]})
-def get_post(request, post_id: int, expand: list[Expandable] = _EXPAND_QUERY):
+@router.get(
+    "/posts/{post_id}",
+    response={200: Envelope[PostDetailOut], 400: Envelope[None], 404: Envelope[None]},
+)
+def get_post(
+    request,
+    post_id: int,
+    expand: list[Expandable] = Query(default_factory=list),  # noqa: B008  django-ninja param marker
+):
     post = (
         Post.objects.select_related("author")
         .prefetch_related("tags")

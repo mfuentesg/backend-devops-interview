@@ -20,7 +20,10 @@ def _user_detail(user: User) -> dict:
     }
 
 
-@router.get("/users/{int:user_id}", response={200: Envelope[UserDetailOut], 404: Envelope[None]})
+@router.get(
+    "/users/{int:user_id}",
+    response={200: Envelope[UserDetailOut], 400: Envelope[None], 404: Envelope[None]},
+)
 def get_user(request, user_id: int):
     user = User.objects.filter(id=user_id).first()
     if user is None:
