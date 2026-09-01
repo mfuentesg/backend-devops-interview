@@ -1,10 +1,19 @@
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
-from ninja import Router
+from ninja import Query, Router
 
-from blog.api.helpers import _serialize_author, _serialize_comment, _serialize_tag
+from blog.api.helpers import _serialize_author, _serialize_comment, _serialize_tag, paginate
+from blog.api.responses import ApiResponse
 from blog.models import Post, Tag, User
-from blog.schemas import PostCreateIn, PostCreateOut, PostDetailOut, PostListOut
+from blog.schemas import (
+    Envelope,
+    PostCreateIn,
+    PostCreateOut,
+    PostDetailOut,
+    PostFilters,
+    PostListOut,
+    SortOrder,
+)
 
 router = Router()
 
@@ -20,26 +29,26 @@ def _serialize_post_list(post: Post) -> dict:
     }
 
 
-@router.get("/posts", response=list[PostListOut])
-def list_posts(request):
-    posts = Post.objects.filter(is_published=True).order_by("-created_at")
-    return [_serialize_post_list(p) for p in posts]
+@router.get("/posts", response={200: Envelope[list[PostListOut]], 400: Envelope[None]})
+def list_posts(
+    request,
+    filters: Query[PostFilters],
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+):
+    qs = Post.objects.select_related("author").prefetch_related("tags")
+    if filters.published is not None:
+        qs = qs.filter(is_published=filters.published)
+    if filters.query:
+        qs = qs.filter(Q(title__icontains=filters.query) | Q(body__icontains=filters.query))
+    if filters.slug:
+        qs = qs.filter(tags__slug=filters.slug)
+    qs = qs.order_by("created_at" if filters.sort == SortOrder.asc else "-created_at")
 
-
-@router.get("/posts/search", response=list[PostListOut])
-def search_posts(request, q: str):
-    posts = Post.objects.filter(
-        Q(title__icontains=q) | Q(body__icontains=q),
-        is_published=True,
-    ).order_by("-created_at")
-    return [_serialize_post_list(p) for p in posts]
-
-
-@router.get("/posts/by-tag/{slug}", response=list[PostListOut])
-def posts_by_tag(request, slug: str):
-    tag = get_object_or_404(Tag, slug=slug)
-    posts = tag.posts.filter(is_published=True).order_by("-created_at")
-    return [_serialize_post_list(p) for p in posts]
+    items, total = paginate(qs, page, limit)
+    return ApiResponse.paginated(
+        [_serialize_post_list(p) for p in items], page=page, limit=limit, total=total
+    )
 
 
 @router.get("/posts/{post_id}", response=PostDetailOut)

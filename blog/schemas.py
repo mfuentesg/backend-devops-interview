@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import Enum
 
 from ninja import Schema
 
@@ -91,3 +92,15 @@ class Envelope[T](Schema):
     meta: Meta | None = None
     status_code: int
     errors: list[ErrorItem] = []
+
+
+class SortOrder(str, Enum):
+    asc = "asc"
+    desc = "desc"
+
+
+class PostFilters(Schema):
+    published: bool | None = None
+    sort: SortOrder = SortOrder.desc
+    query: str | None = None
+    slug: str | None = None
