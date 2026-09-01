@@ -94,11 +94,6 @@ class PostCreateIn(Schema):
         return out
 
 
-class PostCreateOut(Schema):
-    id: int
-    title: str
-
-
 class CommentCreateIn(Schema):
     author_id: int
     body: str
@@ -110,10 +105,6 @@ class CommentCreateIn(Schema):
         if not v:
             raise ValueError("body must not be empty")
         return v
-
-
-class CommentCreateOut(Schema):
-    id: int
 
 
 class ErrorItem(Schema):
