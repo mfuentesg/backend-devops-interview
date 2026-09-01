@@ -8,6 +8,16 @@ from ninja import Schema
 from pydantic import field_validator
 
 
+def _sanitize_text(value: str) -> str:
+    """Reduce a free-text field to inert plain text.
+
+    Unescape first so a pre-encoded payload (``&lt;script&gt;``) is exposed as
+    real markup, strip every tag, then unescape again to undo nh3's
+    re-encoding of bare ``&``/``<``/``>`` in ordinary prose.
+    """
+    return html.unescape(nh3.clean(html.unescape(value.strip()), tags=set())).strip()
+
+
 class AuthorOut(Schema):
     id: int
     username: str
@@ -67,7 +77,7 @@ class PostCreateIn(Schema):
     @field_validator("title")
     @classmethod
     def _clean_title(cls, v: str) -> str:
-        v = html.unescape(nh3.clean(v.strip(), tags=set())).strip()
+        v = _sanitize_text(v)
         if not v:
             raise ValueError("title must not be empty")
         if len(v) > 255:
@@ -77,7 +87,7 @@ class PostCreateIn(Schema):
     @field_validator("body")
     @classmethod
     def _clean_body(cls, v: str) -> str:
-        v = html.unescape(nh3.clean(v.strip(), tags=set())).strip()
+        v = _sanitize_text(v)
         if not v:
             raise ValueError("body must not be empty")
         return v
@@ -102,7 +112,7 @@ class CommentCreateIn(Schema):
     @field_validator("body")
     @classmethod
     def _clean_body(cls, v: str) -> str:
-        v = html.unescape(nh3.clean(v.strip(), tags=set())).strip()
+        v = _sanitize_text(v)
         if not v:
             raise ValueError("body must not be empty")
         return v
