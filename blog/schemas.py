@@ -1,3 +1,4 @@
+import html
 import re
 from datetime import datetime
 from enum import Enum
@@ -66,7 +67,7 @@ class PostCreateIn(Schema):
     @field_validator("title")
     @classmethod
     def _clean_title(cls, v: str) -> str:
-        v = nh3.clean(v.strip(), tags=set()).strip()
+        v = html.unescape(nh3.clean(v.strip(), tags=set())).strip()
         if not v:
             raise ValueError("title must not be empty")
         if len(v) > 255:
@@ -76,7 +77,7 @@ class PostCreateIn(Schema):
     @field_validator("body")
     @classmethod
     def _clean_body(cls, v: str) -> str:
-        v = nh3.clean(v.strip()).strip()
+        v = html.unescape(nh3.clean(v.strip(), tags=set())).strip()
         if not v:
             raise ValueError("body must not be empty")
         return v
@@ -101,7 +102,7 @@ class CommentCreateIn(Schema):
     @field_validator("body")
     @classmethod
     def _clean_body(cls, v: str) -> str:
-        v = nh3.clean(v.strip()).strip()
+        v = html.unescape(nh3.clean(v.strip(), tags=set())).strip()
         if not v:
             raise ValueError("body must not be empty")
         return v
