@@ -72,3 +72,22 @@ class CommentCreateIn(Schema):
 
 class CommentCreateOut(Schema):
     id: int
+
+
+class ErrorItem(Schema):
+    field: str | None = None
+    message: str
+
+
+class Meta(Schema):
+    page: int
+    limit: int
+    total: int
+    total_pages: int
+
+
+class Envelope[T](Schema):
+    data: T | None = None
+    meta: Meta | None = None
+    status_code: int
+    errors: list[ErrorItem] = []
