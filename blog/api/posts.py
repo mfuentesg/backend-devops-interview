@@ -2,11 +2,18 @@ from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from ninja import Query, Router
 
-from blog.api.helpers import _serialize_author, _serialize_comment, _serialize_tag, paginate
+from blog.api.helpers import (
+    ApiError,
+    _serialize_author,
+    _serialize_comment,
+    _serialize_tag,
+    paginate,
+)
 from blog.api.responses import ApiResponse
 from blog.models import Post, Tag, User
 from blog.schemas import (
     Envelope,
+    Expandable,
     PostCreateIn,
     PostCreateOut,
     PostDetailOut,
@@ -16,6 +23,9 @@ from blog.schemas import (
 )
 
 router = Router()
+
+# B008: Query(...) must not be called in an argument default; bind it once here.
+_EXPAND_QUERY = Query([])
 
 
 def _serialize_post_list(post: Post) -> dict:
@@ -51,14 +61,7 @@ def list_posts(
     )
 
 
-@router.get("/posts/{post_id}", response=PostDetailOut)
-def get_post(request, post_id: int):
-    post = get_object_or_404(Post, id=post_id)
-    post.view_count += 1
-    post.save()
-
-    comments = [_serialize_comment(c) for c in post.comments.order_by("created_at")]
-
+def _serialize_post_detail(post: Post, comments: list) -> dict:
     return {
         "id": post.id,
         "title": post.title,
@@ -70,6 +73,29 @@ def get_post(request, post_id: int):
         "created_at": post.created_at,
         "updated_at": post.updated_at,
     }
+
+
+@router.get("/posts/{post_id}", response={200: Envelope[PostDetailOut], 404: Envelope[None]})
+def get_post(request, post_id: int, expand: list[Expandable] = _EXPAND_QUERY):
+    post = (
+        Post.objects.select_related("author")
+        .prefetch_related("tags")
+        .filter(id=post_id)
+        .first()
+    )
+    if post is None:
+        raise ApiError(404, [{"field": "post_id", "message": f"No post with id {post_id}"}])
+
+    post.view_count += 1
+    post.save(update_fields=["view_count"])
+
+    comments = []
+    if Expandable.comments in expand:
+        comments = [
+            _serialize_comment(c)
+            for c in post.comments.select_related("author").order_by("created_at")
+        ]
+    return ApiResponse.success(_serialize_post_detail(post, comments))
 
 
 @router.post("/posts", response=PostCreateOut)

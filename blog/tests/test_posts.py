@@ -121,3 +121,55 @@ def test_search_and_by_tag_endpoints_are_gone(client):
     # so the shared ValidationError handler answers 400 (see test_api_envelope).
     assert client.get("/api/posts/search?q=x").status_code == 400
     assert client.get("/api/posts/by-tag/python").status_code == 404
+
+
+@pytest.mark.django_db
+def test_get_post_detail_envelope_no_comments_by_default(client, user):
+    from blog.models import Comment
+
+    post = Post.objects.create(author=user, title="Hello", body="World")
+    Comment.objects.create(post=post, author=user, body="hi")
+
+    response = client.get(f"/api/posts/{post.id}")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["title"] == "Hello"
+    assert data["author"]["username"] == "alice"
+    assert data["comments"] == []
+
+
+@pytest.mark.django_db
+def test_get_post_expand_comments(client, user):
+    from blog.models import Comment
+
+    post = Post.objects.create(author=user, title="Hello", body="World")
+    Comment.objects.create(post=post, author=user, body="hi")
+
+    response = client.get(f"/api/posts/{post.id}?expand=comments")
+
+    data = response.json()["data"]
+    assert [c["body"] for c in data["comments"]] == ["hi"]
+
+
+@pytest.mark.django_db
+def test_get_post_invalid_expand_is_400(client, user):
+    post = Post.objects.create(author=user, title="Hello", body="World")
+    assert client.get(f"/api/posts/{post.id}?expand=nope").status_code == 400
+
+
+@pytest.mark.django_db
+def test_get_post_missing_is_404_envelope(client):
+    response = client.get("/api/posts/999999")
+    assert response.status_code == 404
+    body = response.json()
+    assert body["data"] is None
+    assert body["errors"][0]["field"] == "post_id"
+
+
+@pytest.mark.django_db
+def test_get_post_increments_view_count(client, user):
+    post = Post.objects.create(author=user, title="Hello", body="World")
+    client.get(f"/api/posts/{post.id}")
+    post.refresh_from_db()
+    assert post.view_count == 1

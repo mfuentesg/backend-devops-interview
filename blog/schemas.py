@@ -104,3 +104,7 @@ class PostFilters(Schema):
     sort: SortOrder = SortOrder.desc
     query: str | None = None
     slug: str | None = None
+
+
+class Expandable(str, Enum):
+    comments = "comments"
