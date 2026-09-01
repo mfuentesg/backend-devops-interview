@@ -60,9 +60,9 @@ Seeding writes ~100k posts and ~500k comments. Expect a few minutes.
 
 ## What the API does
 
-All routed API endpoints return one envelope: `{ "data": …, "meta": … | null, "status_code": …, "errors": [ { "field", "message" } ] }`.
-Resolver-level responses (unknown path, wrong method, unhandled 500) still fall through to Django's HTML pages.
-`meta` carries `page`, `limit`, `total`, `total_pages` on list endpoints.
+Every `/api/` response is one envelope: `{ "data": …, "meta": … | null, "status_code": …, "errors": [ { "field", "message" } ] }` —
+including unknown paths and wrong-method requests (a middleware wraps those 404/405s). Only an unhandled 500 still
+falls through to Django's HTML page. `meta` carries `page`, `limit`, `total`, `total_pages` on list endpoints.
 
 | Method | Path | Description |
 | ------ | ---- | ----------- |

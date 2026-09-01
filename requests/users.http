@@ -6,5 +6,5 @@ GET {{baseUrl}}/users/1
 ### User profile — unknown id => 404 envelope
 GET {{baseUrl}}/users/999999
 
-### Removed — lookup by email was deleted (privacy / enumeration). Expect 404.
+### Removed — lookup by email was deleted (privacy / enumeration). Expect 404 JSON envelope.
 GET {{baseUrl}}/users/find?email=alice@example.com

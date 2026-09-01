@@ -63,9 +63,12 @@ I'll use this document to cover two things:
 * `blog/api.py` split into a `blog/api/` package: `posts`, `comments`, `users`, plus
   `responses.py` (envelope builder) and `helpers.py` (exception handlers, pagination,
   shared serializers). One file per entity, thin views, no service layer yet.
-* Every routed API endpoint returns `{data, meta, status_code, errors}`. Ninja `ValidationError`
+* Every `/api/` response returns `{data, meta, status_code, errors}`. Ninja `ValidationError`
   and a small `ApiError` are reshaped into that envelope (400 / 404); `/api/docs` shows
-  the wrapped shape via a generic `Envelope[T]` response schema.
+  the wrapped shape via a generic `Envelope[T]` response schema. A thin middleware
+  (`blog/api/middleware.py`) catches the resolver-level 404 (unknown path) and 405
+  (wrong method) that never reach ninja and wraps those too. Only an unhandled 500 still
+  falls through to Django's HTML page.
 * `GET /posts` takes `published`, `sort`, `query`, `slug`, `page`, `limit` (max 100),
   all validated. `select_related`/`prefetch_related` kill the author+tags N+1. Deleted
   `/posts/search` and `/posts/by-tag/{slug}` — folded into the filters.
@@ -112,8 +115,8 @@ I'll use this document to cover two things:
 * Load testing for performance validation
 * Race-safe view_count via F("view_count") + 1. Comma-separated expand values. Full-text
   index for the query filter.
-* JSON 404/405/500 for the whole `/api/` prefix (resolver-level errors and unhandled
-  exceptions still fall through to Django's HTML pages).
+* JSON envelope for unhandled 500s under `/api/` (404 and 405 are done via
+  `blog/api/middleware.py`; 500 needs a catch-all handler and only fires with `DEBUG=False`).
 * Unknown query params on `GET /posts` are silently ignored — django-ninja filters params
   before schema validation, so `extra="forbid"` on the filter schema does nothing (verified).
   A stale `?q=` from the old `/posts/search` returns 200 + everything. Needs an explicit

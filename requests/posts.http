@@ -78,8 +78,8 @@ Content-Type: application/json
 
 { "author_id": 999999, "title": "T", "body": "B", "tag_slugs": ["ghost"] }
 
-### Removed — search is folded into ?query= (route is gone, expect 400)
+### Removed — search is folded into ?query= (route is gone; "search" hits /posts/{id} => 400 envelope)
 GET {{baseUrl}}/posts/search?q=django
 
-### Removed — by-tag is folded into ?slug= (route is gone, expect 404)
+### Removed — by-tag is folded into ?slug= (route is gone, expect 404 JSON envelope)
 GET {{baseUrl}}/posts/by-tag/python
