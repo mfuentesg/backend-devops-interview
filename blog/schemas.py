@@ -106,6 +106,16 @@ class CommentCreateIn(Schema):
     author_id: int
     body: str
 
+    @field_validator("body")
+    @classmethod
+    def _clean_body(cls, v: str) -> str:
+        import nh3
+
+        v = nh3.clean(v.strip()).strip()
+        if not v:
+            raise ValueError("body must not be empty")
+        return v
+
 
 class CommentCreateOut(Schema):
     id: int

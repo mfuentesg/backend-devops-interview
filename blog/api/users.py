@@ -1,8 +1,9 @@
-from django.shortcuts import get_object_or_404
 from ninja import Router
 
+from blog.api.helpers import ApiError
+from blog.api.responses import ApiResponse
 from blog.models import User
-from blog.schemas import UserDetailOut
+from blog.schemas import Envelope, UserDetailOut
 
 router = Router()
 
@@ -19,13 +20,9 @@ def _user_detail(user: User) -> dict:
     }
 
 
-@router.get("/users/find", response=UserDetailOut)
-def find_user_by_email(request, email: str):
-    user = get_object_or_404(User, email=email)
-    return _user_detail(user)
-
-
-@router.get("/users/{user_id}", response=UserDetailOut)
+@router.get("/users/{int:user_id}", response={200: Envelope[UserDetailOut], 404: Envelope[None]})
 def get_user(request, user_id: int):
-    user = get_object_or_404(User, id=user_id)
-    return _user_detail(user)
+    user = User.objects.filter(id=user_id).first()
+    if user is None:
+        raise ApiError(404, [{"field": "user_id", "message": f"No user with id {user_id}"}])
+    return ApiResponse.success(_user_detail(user))
