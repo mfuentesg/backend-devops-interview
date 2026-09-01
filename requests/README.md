@@ -6,10 +6,8 @@ Runnable request collections for the endpoints in `blog/api/`.
 - **VS Code**: install the "REST Client" extension (`humao.rest-client`), open a file,
   click "Send Request" above each `###` block.
 
-Both pick variables from `http-client.env.json`. VS Code REST Client reads
-`http-client.env.json` automatically; pick the `local` environment from its status-bar
-env picker. JetBrains: choose `local` from the env dropdown at the top-right of the
-`.http` editor. `local` points at `http://localhost:8000/api`.
+Each file defines its own `@baseUrl` at the top (`http://localhost:8000/api`). Change
+that one line to point at another environment.
 
 Requests assume a seeded database — `author_id: 1` and `posts/1` exist after
 `python manage.py seed`.

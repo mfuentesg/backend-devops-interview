@@ -1,3 +1,5 @@
+@baseUrl = http://localhost:8000/api
+
 ### Add a comment — success => 201, returns the comment
 POST {{baseUrl}}/posts/1/comments
 Content-Type: application/json
