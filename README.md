@@ -43,6 +43,8 @@ the tracked template; copy it (`cp .env.example .env`) and edit as needed.
 | Variable            | Default                    |
 | ------------------- | -------------------------- |
 | `SECRET_KEY`        | an insecure dev key        |
+| `DEBUG`             | `True`                     |
+| `ALLOWED_HOSTS`     | `[]` (empty)               |
 | `LANGUAGE_CODE`     | `en-us`                    |
 | `TIME_ZONE`         | `America/Santiago`         |
 | `POSTGRES_DB`       | `backend_devops_interview` |

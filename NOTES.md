@@ -39,6 +39,11 @@ I'll use this document to cover two things:
   real env vars still win. README updated with the table and the `docker compose` quickstart.
 * Rotated `SECRET_KEY`. The old one was committed, so it's burned. The default now is a
   fresh insecure dev key, clearly marked, and any real deployment sets its own.
+* `DEBUG` and `ALLOWED_HOSTS` now come from env. Defaults are `DEBUG=True` and
+  `ALLOWED_HOSTS=[]`; with `DEBUG=True` Django already covers `.localhost`, `127.0.0.1`
+  and `[::1]`, so local work needs nothing. Dropped the old `ALLOWED_HOSTS = ["*"]`.
+  `.env.example` and the README table updated. The `DEBUG=False` security block still
+  rides with the deploy work.
 * `ruff` moved to `mise.toml`, pinned, instead of a `uv` dev dependency. It's a standalone
   binary and doesn't need the venv, and pinning means every machine and CI lint the same.
   Also excluded generated migrations from lint, so `ruff check .` is clean.
@@ -80,8 +85,8 @@ I'll use this document to cover two things:
 * Adopt `ruff format` repo-wide, 5 files currently diverge, then add a
   `ruff format --check` gate to CI. Left the format pass out for now to keep this
   diff focused.
-* `DEBUG` and `ALLOWED_HOSTS` to env as well, then the `DEBUG=False` security block
-  (SSL redirect, secure cookies, HSTS, `CSRF_TRUSTED_ORIGINS`) with the deploy work.
+* The `DEBUG=False` security block (SSL redirect, secure cookies, HSTS,
+  `CSRF_TRUSTED_ORIGINS`) with the deploy work.
 * A production server (gunicorn or uvicorn) and a multi-stage `Dockerfile`, then k8s
   manifests or an ECS task definition.
 * Observability: Prometheus metrics endpoint, Grafana dashboards, Loki for the logs.

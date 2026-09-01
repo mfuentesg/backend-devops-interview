@@ -8,6 +8,10 @@ env = environ.Env(
     # Insecure dev-only default. Set a real SECRET_KEY in the environment for
     # any deployment; the previous checked-in key has been rotated out.
     SECRET_KEY=(str, "django-insecure-unsecure"),
+    DEBUG=(bool, True),
+    # Empty by default. With DEBUG=True, Django falls back to
+    # ['.localhost', '127.0.0.1', '[::1]'], which covers local work.
+    ALLOWED_HOSTS=(list, []),
     LANGUAGE_CODE=(str, "en-us"),
     TIME_ZONE=(str, "America/Santiago"),
     POSTGRES_DB=(str, "backend_devops_interview"),
@@ -19,12 +23,6 @@ env = environ.Env(
 # Read a local .env file if present. Real environment variables always win,
 # so this is a no-op in CI and production.
 environ.Env.read_env(BASE_DIR / ".env")
-
-SECRET_KEY = env("SECRET_KEY")
-
-DEBUG = True
-
-ALLOWED_HOSTS = ["*"]
 
 
 INSTALLED_APPS = [
@@ -87,12 +85,13 @@ AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-
+SECRET_KEY = env("SECRET_KEY")
+DEBUG = env("DEBUG")
+ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 LANGUAGE_CODE = env("LANGUAGE_CODE")
 TIME_ZONE = env("TIME_ZONE")
+
 USE_I18N = True
 USE_TZ = True
-
 STATIC_URL = "static/"
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
