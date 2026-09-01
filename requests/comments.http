@@ -1,0 +1,29 @@
+### Add a comment — success => 201, returns the comment
+POST {{baseUrl}}/posts/1/comments
+Content-Type: application/json
+
+{ "author_id": 1, "body": "Great post!" }
+
+### Add a comment — HTML in body is stripped
+POST {{baseUrl}}/posts/1/comments
+Content-Type: application/json
+
+{ "author_id": 1, "body": "<script>x</script>still fine" }
+
+### Add a comment — unknown post => 404 envelope
+POST {{baseUrl}}/posts/999999/comments
+Content-Type: application/json
+
+{ "author_id": 1, "body": "hi" }
+
+### Add a comment — unknown author => 400 envelope
+POST {{baseUrl}}/posts/1/comments
+Content-Type: application/json
+
+{ "author_id": 999999, "body": "hi" }
+
+### Add a comment — empty body => 400
+POST {{baseUrl}}/posts/1/comments
+Content-Type: application/json
+
+{ "author_id": 1, "body": "   " }

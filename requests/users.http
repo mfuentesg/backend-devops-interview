@@ -1,0 +1,8 @@
+### User profile — success
+GET {{baseUrl}}/users/1
+
+### User profile — unknown id => 404 envelope
+GET {{baseUrl}}/users/999999
+
+### Removed — lookup by email was deleted (privacy / enumeration). Expect 404.
+GET {{baseUrl}}/users/find?email=alice@example.com

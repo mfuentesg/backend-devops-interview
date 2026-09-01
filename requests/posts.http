@@ -1,0 +1,80 @@
+### List posts — defaults (page 1, limit 20, newest first, all publish states)
+GET {{baseUrl}}/posts
+
+### List posts — published only
+GET {{baseUrl}}/posts?published=true
+
+### List posts — drafts only
+GET {{baseUrl}}/posts?published=false
+
+### List posts — text search across title and body
+GET {{baseUrl}}/posts?query=django
+
+### List posts — by tag slug (unknown slug returns an empty list, still 200)
+GET {{baseUrl}}/posts?slug=python
+
+### List posts — oldest first
+GET {{baseUrl}}/posts?sort=asc
+
+### List posts — page 2, 50 per page
+GET {{baseUrl}}/posts?page=2&limit=50
+
+### List posts — combined filters
+GET {{baseUrl}}/posts?published=true&query=django&sort=desc&page=1&limit=10
+
+### List posts — limit over the max => 400 with a `limit` error
+GET {{baseUrl}}/posts?limit=101
+
+### List posts — invalid sort value => 400
+GET {{baseUrl}}/posts?sort=sideways
+
+### Post detail — no comments by default
+GET {{baseUrl}}/posts/1
+
+### Post detail — expand comments
+GET {{baseUrl}}/posts/1?expand=comments
+
+### Post detail — invalid expand value => 400
+GET {{baseUrl}}/posts/1?expand=nope
+
+### Post detail — unknown id => 404 envelope
+GET {{baseUrl}}/posts/999999
+
+### Create post — success => 201, returns the post in detail shape
+POST {{baseUrl}}/posts
+Content-Type: application/json
+
+{
+  "author_id": 1,
+  "title": "A brand new post",
+  "body": "Body text goes here.",
+  "tag_slugs": ["python"]
+}
+
+### Create post — HTML in title/body is stripped
+POST {{baseUrl}}/posts
+Content-Type: application/json
+
+{
+  "author_id": 1,
+  "title": "<b>Bold</b> title",
+  "body": "<script>alert(1)</script>Safe body"
+}
+
+### Create post — empty title => 400
+POST {{baseUrl}}/posts
+Content-Type: application/json
+
+{ "author_id": 1, "title": "   ", "body": "x" }
+
+### Create post — unknown author and unknown tag => 400 listing both
+POST {{baseUrl}}/posts
+Content-Type: application/json
+
+{ "author_id": 999999, "title": "T", "body": "B", "tag_slugs": ["ghost"] }
+
+### Removed — search is folded into ?query= (route is gone, expect 400)
+GET {{baseUrl}}/posts/search?q=django
+
+### Removed — by-tag is folded into ?slug= (route is gone, expect 404)
+GET {{baseUrl}}/posts/by-tag/python
