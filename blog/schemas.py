@@ -2,6 +2,7 @@ import re
 from datetime import datetime
 from enum import Enum
 
+import nh3
 from ninja import Schema
 from pydantic import field_validator
 
@@ -65,8 +66,6 @@ class PostCreateIn(Schema):
     @field_validator("title")
     @classmethod
     def _clean_title(cls, v: str) -> str:
-        import nh3
-
         v = nh3.clean(v.strip(), tags=set()).strip()
         if not v:
             raise ValueError("title must not be empty")
@@ -77,8 +76,6 @@ class PostCreateIn(Schema):
     @field_validator("body")
     @classmethod
     def _clean_body(cls, v: str) -> str:
-        import nh3
-
         v = nh3.clean(v.strip()).strip()
         if not v:
             raise ValueError("body must not be empty")
@@ -109,8 +106,6 @@ class CommentCreateIn(Schema):
     @field_validator("body")
     @classmethod
     def _clean_body(cls, v: str) -> str:
-        import nh3
-
         v = nh3.clean(v.strip()).strip()
         if not v:
             raise ValueError("body must not be empty")
