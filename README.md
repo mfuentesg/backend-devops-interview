@@ -60,16 +60,19 @@ Seeding writes ~100k posts and ~500k comments. Expect a few minutes.
 
 ## What the API does
 
+All responses share one envelope: `{ "data": …, "meta": … | null, "status_code": …, "errors": [ { "field", "message" } ] }`.
+`meta` carries `page`, `limit`, `total`, `total_pages` on list endpoints.
+
 | Method | Path | Description |
 | ------ | ---- | ----------- |
-| GET    | `/api/posts` | Published posts, newest first |
-| GET    | `/api/posts/search?q=` | Full-text-ish search across title and body |
-| GET    | `/api/posts/by-tag/{slug}` | Posts carrying a given tag |
-| GET    | `/api/posts/{id}` | Post detail with comments |
-| POST   | `/api/posts` | Create a post |
-| POST   | `/api/posts/{id}/comments` | Add a comment to a post |
-| GET    | `/api/users/{id}` | User profile with post and comment counts |
-| GET    | `/api/users/find?email=` | Look up a user by email |
+| GET    | `/api/posts` | List posts. Query params: `published` (`true`/`false`/omit=all), `sort` (`asc`/`desc` on `created_at`), `query` (matches title or body), `slug` (posts carrying that tag slug), `page` (≥1), `limit` (1–100, default 20). |
+| GET    | `/api/posts/{id}` | Post detail. `expand=comments` to include comments (omitted → `[]`). |
+| POST   | `/api/posts` | Create a post. Title/body are HTML-sanitised; unknown `author_id` or `tag_slugs` → 400. Returns 201 with the post in detail shape. |
+| POST   | `/api/posts/{id}/comments` | Add a comment. Returns 201 with the comment. |
+| GET    | `/api/users/{id}` | User profile with post and comment counts. |
+
+Ready-to-run requests for every scenario live in `requests/*.http` (JetBrains HTTP
+Client or the VS Code REST Client extension) — see `requests/README.md`.
 
 ## The assignment
 

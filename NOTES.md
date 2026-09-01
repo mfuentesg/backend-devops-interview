@@ -60,6 +60,24 @@ I'll use this document to cover two things:
   `mise.toml`, so CI and local run the exact same pinned tools; uv venv is cached on
   `uv.lock`. A `build-and-push` job (GHCR image) is scaffolded but commented out until
   there's a `Dockerfile`.
+* `blog/api.py` split into a `blog/api/` package: `posts`, `comments`, `users`, plus
+  `responses.py` (envelope builder) and `helpers.py` (exception handlers, pagination,
+  shared serializers). One file per entity, thin views, no service layer yet.
+* Every endpoint now returns `{data, meta, status_code, errors}`. Ninja `ValidationError`
+  and a small `ApiError` are reshaped into that envelope (400 / 404); `/api/docs` shows
+  the wrapped shape via a generic `Envelope[T]` response schema.
+* `GET /posts` takes `published`, `sort`, `query`, `slug`, `page`, `limit` (max 100),
+  all validated. `select_related`/`prefetch_related` kill the author+tags N+1. Deleted
+  `/posts/search` and `/posts/by-tag/{slug}` — folded into the filters.
+* `GET /posts/{id}` gained `expand=comments`; comments are skipped unless asked for.
+  `view_count` bump uses `update_fields=["view_count"]`.
+* `POST /posts` sanitises title/body with `nh3`, validates author + tag slugs up front,
+  returns 400 listing every bad value, 201 with the created post otherwise.
+* Deleted `GET /users/find` — unauthenticated lookup by arbitrary email is an
+  enumeration / DoS surface with no real use here.
+* Added `requests/*.http` — runnable request files (JetBrains HTTP Client / VS Code
+  REST Client) with every success and error scenario, so the API is explorable from
+  the editor without curl.
 
 ## Self taste
 
@@ -79,6 +97,7 @@ I'll use this document to cover two things:
 * Tracing tools. I consider this is too much for this project.
 * `COPY`-based bulk load and splitting `handle()` in the seeder. Real rewrites for the last
   minute or so of seed time.
+* A selector/service layer and a hexagonal layout — the package split is enough for now.
 
 ## What I'd do next
 
@@ -90,3 +109,6 @@ I'll use this document to cover two things:
 * A production server (gunicorn or uvicorn) and a multi-stage `Dockerfile`, then k8s
   manifests or an ECS task definition.
 * Observability: Prometheus metrics endpoint, Grafana dashboards, Loki for the logs.
+* Load testing for performance validation
+* Race-safe view_count via F("view_count") + 1. Comma-separated expand values. Full-text
+  index for the query filter.
