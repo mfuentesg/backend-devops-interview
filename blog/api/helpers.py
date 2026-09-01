@@ -49,10 +49,10 @@ def register_exception_handlers(api: NinjaAPI) -> None:
             }
             for e in exc.errors
         ]
-        status, body = ApiResponse.error(errors, status=400)
-        return api.create_response(request, body, status=status)
+        resp = ApiResponse.error(errors, status=400)
+        return api.create_response(request, resp.value, status=resp.status_code)
 
     @api.exception_handler(ApiError)
     def _on_api_error(request, exc):
-        status, body = ApiResponse.error(exc.errors, status=exc.status)
-        return api.create_response(request, body, status=status)
+        resp = ApiResponse.error(exc.errors, status=exc.status)
+        return api.create_response(request, resp.value, status=resp.status_code)
