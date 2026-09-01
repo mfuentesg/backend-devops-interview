@@ -25,7 +25,7 @@ def _titles(response):
 
 
 @pytest.mark.django_db
-def test_list_posts_returns_published_by_default(client, user):
+def test_list_posts_returns_all_publish_states_by_default(client, user):
     tag = Tag.objects.create(name="Python", slug="python")
     post = Post.objects.create(author=user, title="Hello", body="World")
     post.tags.add(tag)
@@ -37,7 +37,6 @@ def test_list_posts_returns_published_by_default(client, user):
     body = response.json()
     assert body["status_code"] == 200
     assert "Hello" in _titles(response)
-    # default returns published only? No — see spec: omitted = all. Draft IS included.
     assert "Draft" in _titles(response)
     assert body["meta"]["page"] == 1
     assert body["meta"]["limit"] == 20
@@ -100,8 +99,26 @@ def test_pagination(client, user):
 
     response = client.get("/api/posts?sort=asc&page=2&limit=10")
     body = response.json()
-    assert [p["title"] for p in body["data"]] == [f"P{i:02d}" for i in range(10, 20)]
+    expected = list(
+        Post.objects.order_by("created_at", "id").values_list("title", flat=True)
+    )[10:20]
+    assert [p["title"] for p in body["data"]] == expected
     assert body["meta"] == {"page": 2, "limit": 10, "total": 25, "total_pages": 3}
+
+
+@pytest.mark.django_db
+def test_list_posts_query_count_is_bounded(client, user, django_assert_num_queries):
+    tags = [Tag.objects.create(name=f"T{i}", slug=f"t{i}") for i in range(4)]
+    for i in range(15):
+        post = Post.objects.create(author=user, title=f"P{i:02d}", body="x")
+        post.tags.set(tags[i % 2 : i % 2 + 2])
+
+    # count + page + prefetch(tags); author is select_related. A regression that drops
+    # select_related/prefetch_related would blow this past the fixed number.
+    with django_assert_num_queries(3):
+        response = client.get("/api/posts?limit=20")
+    assert response.status_code == 200
+    assert len(response.json()["data"]) == 15
 
 
 @pytest.mark.django_db
