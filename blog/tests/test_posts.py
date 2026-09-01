@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from django.test import Client
 
@@ -173,3 +175,64 @@ def test_get_post_increments_view_count(client, user):
     client.get(f"/api/posts/{post.id}")
     post.refresh_from_db()
     assert post.view_count == 1
+
+
+def _post(client, payload):
+    return client.post(
+        "/api/posts", data=json.dumps(payload), content_type="application/json"
+    )
+
+
+@pytest.mark.django_db
+def test_create_post_success_returns_201_detail_shape(client, user):
+    Tag.objects.create(name="Python", slug="python")
+    response = _post(
+        client,
+        {"author_id": user.id, "title": "  Hi  ", "body": "Body text", "tag_slugs": ["python"]},
+    )
+    assert response.status_code == 201
+    data = response.json()["data"]
+    assert data["title"] == "Hi"  # stripped
+    assert data["comments"] == []
+    assert [t["slug"] for t in data["tags"]] == ["python"]
+    assert Post.objects.filter(title="Hi").exists()
+
+
+@pytest.mark.django_db
+def test_create_post_strips_html(client, user):
+    response = _post(
+        client,
+        {"author_id": user.id, "title": "<b>Bold</b>", "body": "<script>evil()</script>safe"},
+    )
+    assert response.status_code == 201
+    data = response.json()["data"]
+    assert data["title"] == "Bold"
+    assert "<script>" not in data["body"] and "safe" in data["body"]
+
+
+@pytest.mark.django_db
+def test_create_post_empty_title_is_400(client, user):
+    response = _post(client, {"author_id": user.id, "title": "   ", "body": "x"})
+    assert response.status_code == 400
+    assert any(e["field"] == "title" for e in response.json()["errors"])
+
+
+@pytest.mark.django_db
+def test_create_post_unknown_author_and_tag_reports_both(client):
+    response = _post(
+        client,
+        {"author_id": 999999, "title": "T", "body": "B", "tag_slugs": ["ghost"]},
+    )
+    assert response.status_code == 400
+    fields = {e["field"] for e in response.json()["errors"]}
+    assert fields == {"author_id", "tag_slugs"}
+    assert Post.objects.count() == 0
+
+
+@pytest.mark.django_db
+def test_create_post_invalid_slug_format_is_400(client, user):
+    response = _post(
+        client, {"author_id": user.id, "title": "T", "body": "B", "tag_slugs": ["Bad Slug!"]}
+    )
+    assert response.status_code == 400
+    assert any(e["field"] == "tag_slugs" for e in response.json()["errors"])

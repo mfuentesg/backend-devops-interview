@@ -1,7 +1,9 @@
+import re
 from datetime import datetime
 from enum import Enum
 
 from ninja import Schema
+from pydantic import field_validator
 
 
 class AuthorOut(Schema):
@@ -59,6 +61,40 @@ class PostCreateIn(Schema):
     title: str
     body: str
     tag_slugs: list[str] = []
+
+    @field_validator("title")
+    @classmethod
+    def _clean_title(cls, v: str) -> str:
+        import nh3
+
+        v = nh3.clean(v.strip(), tags=set()).strip()
+        if not v:
+            raise ValueError("title must not be empty")
+        if len(v) > 255:
+            raise ValueError("title must be at most 255 characters")
+        return v
+
+    @field_validator("body")
+    @classmethod
+    def _clean_body(cls, v: str) -> str:
+        import nh3
+
+        v = nh3.clean(v.strip()).strip()
+        if not v:
+            raise ValueError("body must not be empty")
+        return v
+
+    @field_validator("tag_slugs")
+    @classmethod
+    def _clean_slugs(cls, v: list[str]) -> list[str]:
+        out: list[str] = []
+        for raw in v:
+            s = raw.strip().lower()
+            if not re.fullmatch(r"[a-z0-9-]+", s):
+                raise ValueError(f"invalid tag slug: {raw!r}")
+            if s not in out:
+                out.append(s)
+        return out
 
 
 class PostCreateOut(Schema):

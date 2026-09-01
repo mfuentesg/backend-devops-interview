@@ -1,5 +1,5 @@
+from django.db import transaction
 from django.db.models import Q
-from django.shortcuts import get_object_or_404
 from ninja import Query, Router
 
 from blog.api.helpers import (
@@ -15,7 +15,6 @@ from blog.schemas import (
     Envelope,
     Expandable,
     PostCreateIn,
-    PostCreateOut,
     PostDetailOut,
     PostFilters,
     PostListOut,
@@ -98,11 +97,28 @@ def get_post(request, post_id: int, expand: list[Expandable] = _EXPAND_QUERY):
     return ApiResponse.success(_serialize_post_detail(post, comments))
 
 
-@router.post("/posts", response=PostCreateOut)
+@router.post("/posts", response={201: Envelope[PostDetailOut], 400: Envelope[None]})
 def create_post(request, payload: PostCreateIn):
-    author = get_object_or_404(User, id=payload.author_id)
-    post = Post.objects.create(author=author, title=payload.title, body=payload.body)
-    for slug in payload.tag_slugs:
-        tag = Tag.objects.get(slug=slug)
-        post.tags.add(tag)
-    return {"id": post.id, "title": post.title}
+    with transaction.atomic():
+        errors: list[dict] = []
+
+        author = User.objects.filter(id=payload.author_id).first()
+        if author is None:
+            errors.append(
+                {"field": "author_id", "message": f"No user with id {payload.author_id}"}
+            )
+
+        found = list(Tag.objects.filter(slug__in=payload.tag_slugs))
+        missing = [s for s in payload.tag_slugs if s not in {t.slug for t in found}]
+        if missing:
+            errors.append(
+                {"field": "tag_slugs", "message": f"unknown slugs: {', '.join(missing)}"}
+            )
+
+        if errors:
+            raise ApiError(400, errors)
+
+        post = Post.objects.create(author=author, title=payload.title, body=payload.body)
+        post.tags.set(found)
+
+    return ApiResponse.success(_serialize_post_detail(post, []), status=201)
