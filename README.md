@@ -7,15 +7,16 @@ A small content service: users, posts, comments, tags. Django + Ninja + Postgres
 Prereqs:
 
 - [mise](https://mise.jdx.dev/) — manages the Python toolchain, uv and ruff.
-- [Docker](https://docs.docker.com/get-docker/) with Compose — runs Postgres and pgAdmin.
+- [Docker](https://docs.docker.com/get-docker/) with Compose — runs Postgres, pgAdmin
+  and the monitoring stack (Prometheus, Grafana, postgres-exporter).
 
 Steps:
 
 ```sh
 mise install
 uv sync
-cp .env.example .env                     # database config; defaults match docker-compose
-docker compose up -d                     # Postgres on :5432, pgAdmin on :8080
+cp .env.example .env                     # config; defaults match docker-compose
+docker compose up -d                     # Postgres :5432, pgAdmin :8080, Prometheus :9090, Grafana :3000
 uv run python manage.py migrate
 uv run python manage.py seed
 uv run python manage.py runserver
@@ -23,6 +24,11 @@ uv run python manage.py runserver
 
 API docs at <http://localhost:8000/api/docs>. pgAdmin at <http://localhost:8080>
 (`admin@example.com` / `postgres`), already connected to the local database.
+
+Grafana at <http://localhost:3000> (dashboards open anonymously; edit as `admin` /
+`admin`) ships two provisioned dashboards — **PostgreSQL** and **Django** — wired to
+Prometheus, which scrapes `postgres-exporter` and the app's `/metrics` endpoint
+(`django-prometheus`). `runserver` must be up for the Django target to report.
 
 Lint and tests:
 
@@ -44,7 +50,7 @@ the tracked template; copy it (`cp .env.example .env`) and edit as needed.
 | ------------------- | -------------------------- |
 | `SECRET_KEY`        | an insecure dev key        |
 | `DEBUG`             | `True`                     |
-| `ALLOWED_HOSTS`     | `[]` (empty)               |
+| `ALLOWED_HOSTS`     | `*` (dev; narrow for prod) |
 | `LANGUAGE_CODE`     | `en-us`                    |
 | `TIME_ZONE`         | `America/Santiago`         |
 | `POSTGRES_DB`       | `backend_devops_interview` |
@@ -53,12 +59,18 @@ the tracked template; copy it (`cp .env.example .env`) and edit as needed.
 | `POSTGRES_HOST`     | `localhost`                |
 | `POSTGRES_PORT`     | `5432`                     |
 
+`ALLOWED_HOSTS` ships `*` so the Prometheus container can scrape the host-run app
+via `host.docker.internal`; set explicit hostnames for any real deployment.
+
 `docker-compose.yml` also reads `.env`: `POSTGRES_DB` / `POSTGRES_USER` /
 `POSTGRES_PASSWORD` seed the Postgres container plus pgAdmin's pre-registered
 connection (`servers.json` + `pgpass`), `POSTGRES_PORT` maps the published host
 port, and `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` (defaults
 `admin@example.com` / `postgres`) are the pgAdmin login. pgAdmin reaches Postgres
 over the Compose network as `postgres:5432` regardless of the host settings.
+`postgres-exporter` uses the same `POSTGRES_*` credentials; Grafana's login is
+`GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` (defaults `admin` / `admin`) and it
+publishes on `GRAFANA_PORT` (default `3000`).
 
 Any real deployment must set its own `SECRET_KEY` (generate one with
 `uv run python -c "from django.core.management.utils import get_random_secret_key as g; print(g())"`).

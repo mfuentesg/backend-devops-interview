@@ -49,11 +49,12 @@ I'll use this document to cover two things:
   real env vars still win. README updated with the table and the `docker compose` quickstart.
 * Rotated `SECRET_KEY`. The old one was committed, so it's burned. The default now is a
   fresh insecure dev key, clearly marked, and any real deployment sets its own.
-* `DEBUG` and `ALLOWED_HOSTS` now come from env. Defaults are `DEBUG=True` and
-  `ALLOWED_HOSTS=[]`; with `DEBUG=True` Django already covers `.localhost`, `127.0.0.1`
-  and `[::1]`, so local work needs nothing. Dropped the old `ALLOWED_HOSTS = ["*"]`.
-  `.env.example` and the README table updated. The `DEBUG=False` security block still
-  rides with the deploy work.
+* `DEBUG` and `ALLOWED_HOSTS` now come from env. `DEBUG=True` by default;
+  `.env` / `.env.example` ship `ALLOWED_HOSTS=*` so the Prometheus container can
+  scrape the host-run app via `host.docker.internal` (Django checks the `Host`
+  header even under `DEBUG`, and its fallback only covers `.localhost` / `127.0.0.1`
+  / `[::1]`). Schema default stays `[]`. Narrow the list for any real deployment;
+  the `DEBUG=False` security block still rides with the deploy work.
 * `ruff` moved to `mise.toml`, pinned, instead of a `uv` dev dependency. It's a standalone
   binary and doesn't need the venv, and pinning means every machine and CI lint the same.
   Also excluded generated migrations from lint, so `ruff check .` is clean.
@@ -91,12 +92,34 @@ I'll use this document to cover two things:
 * Added `requests/*.http` — runnable request files (JetBrains HTTP Client / VS Code
   REST Client) with every success and error scenario, so the API is explorable from
   the editor without curl.
+* Monitoring stack, all in `docker-compose.yml`: `postgres-exporter`, `prometheus`,
+  `grafana`, plus `django-prometheus` (middleware + `/metrics`) on the host app.
+  Images pinned (`postgres-exporter:v0.20.1`, `prometheus:v3.14.0`,
+  `grafana:13.2.1`).
+  - Prometheus (`monitoring/prometheus.yml`) scrapes `pgexporter:9187` by service
+    name on the compose network and the host-run app at `host.docker.internal:8000`.
+  - `pgexporter` `DATA_SOURCE_PASS` reads `${POSTGRES_PASSWORD:-postgres}` — same
+    var as the Postgres container, so one credential drives both.
+  - Grafana is provisioned from `monitoring/grafana/provisioning/` (Prometheus
+    datasource, uid `prometheus`) + `monitoring/dashboards/`. Two hand-built
+    dashboards, every query checked against live series:
+    - **PostgreSQL** — up, connection saturation, DB size, TPS, cache-hit ratio,
+      tuple throughput, backends by state, locks, deadlocks/temp files. `datname`
+      template var. Single-value stats use `max()`/`sum()` so a renamed exporter
+      instance can't double them.
+    - **Django** — request rate, 4xx/5xx ratio, p95, unapplied migrations, req/s by
+      method, resp/s by status, latency quantiles + p95 by view, exceptions,
+      model writes, body throughput, mean latency.
+    - Anonymous viewer on, admin login via `GRAFANA_ADMIN_USER/PASSWORD`.
+  - Verified end-to-end: all three targets `up`, both dashboards render with data
+    in Grafana.
 
 ## Self taste
 
-* Docker Compose for local development, but only for Postgres and pgAdmin. One command, no
-  cluster to manage. I considered skaffold + kind for native k8s manifests with autoreload,
-  but I don't think it's needed at this moment. Maybe for a future iteration.
+* Docker Compose for local development — Postgres, pgAdmin, and the monitoring stack
+  (Prometheus, Grafana, postgres-exporter). One command, no cluster to manage. I
+  considered skaffold + kind for native k8s manifests with autoreload, but I don't
+  think it's needed at this moment. Maybe for a future iteration.
 * `mise`, `uv` and the app run on the host, not in a container. Editor autocomplete and
   imports need the deps local, and the host disk beats a container bind mount (more on
   macOS). The app still needs an image for production, that's a separate concern.
@@ -107,6 +130,10 @@ I'll use this document to cover two things:
 ## Things I'll keep out
 
 * Helm charts. Not too complex, but I don't think it's required right now, maybe later.
+* A Redis cache layer. Sketched it (a `redis` compose service + `CACHES` in
+  `settings.py`), but at this scale nothing is cache-bound — the perf wins were in
+  the queries and the seeder. It's the first thing I'd add once real traffic shows
+  read amplification; not worth the extra moving part today.
 * Tracing tools. I consider this is too much for this project.
 * `COPY`-based bulk load and splitting `handle()` in the seeder. Real rewrites for the last
   minute or so of seed time.
@@ -121,7 +148,9 @@ I'll use this document to cover two things:
   `CSRF_TRUSTED_ORIGINS`) with the deploy work.
 * A production server (gunicorn or uvicorn) and a multi-stage `Dockerfile`, then k8s
   manifests or an ECS task definition.
-* Observability: Prometheus metrics endpoint, Grafana dashboards, Loki for the logs.
+* Observability: metrics + Grafana dashboards are in; still want Loki for logs,
+  Prometheus alert rules, and swapping the DB engine to
+  `django_prometheus.db.backends.postgresql` for `django_db_*` query metrics.
 * Load testing for performance validation
 * Race-safe view_count via F("view_count") + 1. Comma-separated expand values. Full-text
   index for the query filter.

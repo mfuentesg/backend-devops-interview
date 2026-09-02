@@ -1,0 +1,17 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+  
+  # pgexporter shares the compose network, so reach it by service name.
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['pgexporter:9187']
+
+  # The Django app runs on the host on purpose; scrape it across the boundary.
+  - job_name: 'django-exporter'
+    static_configs:
+      - targets: ['host.docker.internal:8000']

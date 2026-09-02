@@ -13,6 +13,51 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-backend_devops_interview}
 
+  pgexporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_URI: "postgres:5432/${POSTGRES_DB:-backend_devops_interview}?sslmode=disable"
+      DATA_SOURCE_USER: "${POSTGRES_USER:-postgres}"
+      DATA_SOURCE_PASS: "${POSTGRES_PASSWORD:-postgres}"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.14.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:13.2.1
+    container_name: grafana_ui
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      # Dashboards open without a login; editing still needs the admin user.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - grafana_data:/var/lib/grafana
+      # Datasource + dashboard-provider config, then the dashboard JSON itself.
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: pgadmin_ui
@@ -42,6 +87,8 @@ services:
 volumes:
   db_data:
   pgadmin_data:
+  prometheus_data:
+  grafana_data:
 
 # Plain strings built inline from Docker Config blocks. Compose interpolates
 # ${VAR} here at parse time, reading the project .env (real env vars win).
