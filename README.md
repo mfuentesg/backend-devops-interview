@@ -8,7 +8,7 @@ Prereqs:
 
 - [mise](https://mise.jdx.dev/) — manages the Python toolchain, uv and ruff.
 - [Docker](https://docs.docker.com/get-docker/) with Compose — runs Postgres, pgAdmin
-  and the monitoring stack (Prometheus, Grafana, postgres-exporter).
+  and the monitoring stack (Prometheus, Grafana, postgres-exporter, Loki, Alloy).
 
 Steps:
 
@@ -16,7 +16,7 @@ Steps:
 mise install
 uv sync
 cp .env.example .env                     # config; defaults match docker-compose
-docker compose up -d                     # Postgres :5432, pgAdmin :8080, Prometheus :9090, Grafana :3000
+docker compose up -d                     # Postgres :5432, pgAdmin :8080, Prometheus :9090, Grafana :3000, Loki :3100, Alloy :12345
 uv run python manage.py migrate
 uv run python manage.py seed
 uv run python manage.py runserver
@@ -29,6 +29,15 @@ Grafana at <http://localhost:3000> (dashboards open anonymously; edit as `admin`
 `admin`) ships two provisioned dashboards — **PostgreSQL** and **Django** — wired to
 Prometheus, which scrapes `postgres-exporter` and the app's `/metrics` endpoint
 (`django-prometheus`). `runserver` must be up for the Django target to report.
+
+**Logging.** The Django app writes structured JSON to `logs/app.log` when
+`LOG_JSON_FILE=True` (the `.env.example` default). Grafana Alloy tails that file and
+ships it to Loki; the provisioned **Logs** dashboard and Explore query it. `runserver`
+must be up for lines to appear. `LOG_LEVEL` follows `DEBUG` (→ `DEBUG` when
+`DEBUG=True`, else `INFO`) unless set explicitly. Keep the host app running (or start
+it) around `docker compose up` so `logs/app.log` exists for Alloy to tail — on a
+brand-new checkout where the file is absent, `docker compose restart alloy` once it
+appears picks it up.
 
 Lint and tests:
 
@@ -46,18 +55,21 @@ setup, so `.env` is optional for local work.
 `.env` is git-ignored and never committed — it's your machine's copy. `.env.example` is
 the tracked template; copy it (`cp .env.example .env`) and edit as needed.
 
-| Variable            | Default                    |
-| ------------------- | -------------------------- |
-| `SECRET_KEY`        | an insecure dev key        |
-| `DEBUG`             | `True`                     |
-| `ALLOWED_HOSTS`     | `*` (dev; narrow for prod) |
-| `LANGUAGE_CODE`     | `en-us`                    |
-| `TIME_ZONE`         | `America/Santiago`         |
-| `POSTGRES_DB`       | `backend_devops_interview` |
-| `POSTGRES_USER`     | `postgres`                 |
-| `POSTGRES_PASSWORD` | `postgres`                 |
-| `POSTGRES_HOST`     | `localhost`                |
-| `POSTGRES_PORT`     | `5432`                     |
+| Variable            | Default                               |
+| ------------------- | ------------------------------------- |
+| `SECRET_KEY`        | an insecure dev key                   |
+| `DEBUG`             | `True`                                |
+| `ALLOWED_HOSTS`     | `*` (dev; narrow for prod)            |
+| `LANGUAGE_CODE`     | `en-us`                               |
+| `TIME_ZONE`         | `America/Santiago`                    |
+| `POSTGRES_DB`       | `backend_devops_interview`            |
+| `POSTGRES_USER`     | `postgres`                            |
+| `POSTGRES_PASSWORD` | `postgres`                            |
+| `POSTGRES_HOST`     | `localhost`                           |
+| `POSTGRES_PORT`     | `5432`                                |
+| `LOG_LEVEL`         | follows `DEBUG` (`DEBUG`/`INFO`)      |
+| `LOG_DIR`           | `<repo>/logs`                         |
+| `LOG_JSON_FILE`     | `False` (`.env.example` ships `True`) |
 
 `ALLOWED_HOSTS` ships `*` so the Prometheus container can scrape the host-run app
 via `host.docker.internal`; set explicit hostnames for any real deployment.

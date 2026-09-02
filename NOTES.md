@@ -113,6 +113,16 @@ I'll use this document to cover two things:
     - Anonymous viewer on, admin login via `GRAFANA_ADMIN_USER/PASSWORD`.
   - Verified end-to-end: all three targets `up`, both dashboards render with data
     in Grafana.
+* Structured logging: `core/json_log.py` renders each `LogRecord` as one JSON
+  line; a `RotatingFileHandler` writes `logs/app.log` only when `LOG_JSON_FILE`
+  is set, so tests and bare checkouts stay file-free. `LOG_LEVEL` derives from
+  `DEBUG` (`DEBUG`→`DEBUG`, else `INFO`); an explicit value overrides, and
+  `DEBUG=False` + `LOG_LEVEL=DEBUG` warns.
+* Log pipeline in `docker-compose.yml`: `grafana/alloy:v1.19.2` tails the
+  bind-mounted `logs/app.log`, parses the JSON, promotes `level`/`logger` to
+  labels, and pushes to `grafana/loki:3.7.7` (single-binary, filesystem store,
+  7-day retention). Grafana gets a provisioned Loki datasource and a hand-built
+  **Logs** dashboard; Prometheus scrapes both new `/metrics` endpoints.
 
 ## Self taste
 
@@ -138,6 +148,10 @@ I'll use this document to cover two things:
 * `COPY`-based bulk load and splitting `handle()` in the seeder. Real rewrites for the last
   minute or so of seed time.
 * A selector/service layer and a hexagonal layout — the package split is enough for now.
+* Promtail. Alloy supersedes it and already does the tail-parse-push.
+* A MinIO/S3 backend for Loki. The filesystem store is fine at this scale.
+* Pushing logs from Django over the network. Tailing the file keeps the app
+  decoupled from whether the logging stack is up.
 
 ## What I'd do next
 
@@ -148,9 +162,17 @@ I'll use this document to cover two things:
   `CSRF_TRUSTED_ORIGINS`) with the deploy work.
 * A production server (gunicorn or uvicorn) and a multi-stage `Dockerfile`, then k8s
   manifests or an ECS task definition.
-* Observability: metrics + Grafana dashboards are in; still want Loki for logs,
-  Prometheus alert rules, and swapping the DB engine to
+* Observability: metrics + Grafana dashboards are in; still want Prometheus alert
+  rules and swapping the DB engine to
   `django_prometheus.db.backends.postgresql` for `django_db_*` query metrics.
+* Collect container logs too (`loki.source.docker` in Alloy) — right now only
+  the app is covered.
+* Correlation/request IDs threaded into the log context.
+* Loki ruler + alert rules on log-based metrics (error-rate spike).
+* `JsonFormatter` ignores `extra=` fields; serialize them if structured context
+  becomes useful.
+* Drop Alloy's auto `filename` label (`stage.label_drop`) — currently rides along
+  on every stream, harmless but unused.
 * Load testing for performance validation
 * Race-safe view_count via F("view_count") + 1. Comma-separated expand values. Full-text
   index for the query filter.
