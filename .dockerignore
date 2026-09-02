@@ -1,0 +1,30 @@
+# Keep the build context (and image) small: only ship what runs the app.
+.git
+.gitignore
+.github
+.venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.superpowers
+
+# Local env / secrets
+.env
+.env.*
+
+# Dev-only infra and docs
+docker-compose.yml
+compose.prod.yml
+monitoring
+docs
+prompts
+requests
+logs
+*.md
+job-details.md
+
+# Test suite isn't needed at runtime (settings_test.py / conftest.py are tiny
+# and Django-adjacent, so they ride along).
+blog/tests

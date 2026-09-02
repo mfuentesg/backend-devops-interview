@@ -30,6 +30,7 @@ dependencies = [
     { name = "django-ninja" },
     { name = "django-prometheus" },
     { name = "faker" },
+    { name = "gunicorn" },
     { name = "nh3" },
     { name = "psycopg", extra = ["binary"] },
 ]
@@ -47,6 +48,7 @@ requires-dist = [
     { name = "django-ninja", specifier = ">=1.5,<2" },
     { name = "django-prometheus", specifier = ">=2.5.0" },
     { name = "faker", specifier = ">=30" },
+    { name = "gunicorn", specifier = ">=23" },
     { name = "nh3", specifier = ">=0.3.7" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3,<4" },
 ]
@@ -125,6 +127,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/18/06/70886e82d8f1d2b73454f3a7c1b7405300128df22e70d85a828951366932/faker-40.18.0.tar.gz", hash = "sha256:2207575c0e8f90e6ccd6dbef764de875c614d16d3db4eee9712d9a00087f2e70", size = 1968243, upload-time = "2026-05-14T16:43:04.834Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/84/0b/5c0b2d3a4b7a715f1835dd3f963bfbe841a02ae5cad1df8ee0325dfad235/faker-40.18.0-py3-none-any.whl", hash = "sha256:61a6b94b74605ddb090a065deb197a1c585ae7a874c094cf6693671d271e6083", size = 2006355, upload-time = "2026-05-14T16:43:02.489Z" },
+]
+
+[[package]]
+name = "gunicorn"
+version = "26.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d9/8a/e4ef6ee11701b6cd64702848415ffb69eeff85cb388a3c6c7fe86f22f3f8/gunicorn-26.2.0.tar.gz", hash = "sha256:62b864895d9ebff0b2f9867ba04fe811c93121596540830c9c916d0769668447", size = 787921, upload-time = "2026-08-24T15:05:59.3Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fe/85/7522a52e5e2f42faf1a129113ab63e548c42e103e9af395b7bfe65e403e2/gunicorn-26.2.0-py3-none-any.whl", hash = "sha256:bd249d0b3f7972f7432f0a6b6ff3b3ee2d129f70cd1ff6c09a9dd9e29a2b88e3", size = 228389, upload-time = "2026-08-24T15:05:57.67Z" },
 ]
 
 [[package]]
