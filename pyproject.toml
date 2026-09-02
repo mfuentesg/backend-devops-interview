@@ -10,6 +10,7 @@ dependencies = [
     "faker>=30",
     "django-environ>=0.14.0",
     "nh3>=0.3.7",
+    "django-prometheus>=2.5.0",
 ]
 
 [dependency-groups]

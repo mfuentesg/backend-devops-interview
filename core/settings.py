@@ -9,8 +9,9 @@ env = environ.Env(
     # any deployment; the previous checked-in key has been rotated out.
     SECRET_KEY=(str, "django-insecure-unsecure"),
     DEBUG=(bool, True),
-    # Empty by default. With DEBUG=True, Django falls back to
-    # ['.localhost', '127.0.0.1', '[::1]'], which covers local work.
+    # Comma-separated. .env ships "*" for local dev so the Prometheus container
+    # can scrape the host-run app via host.docker.internal; empty falls back to
+    # .localhost / 127.0.0.1 / [::1] under DEBUG. Set explicit hosts for deploys.
     ALLOWED_HOSTS=(list, []),
     LANGUAGE_CODE=(str, "en-us"),
     TIME_ZONE=(str, "America/Santiago"),
@@ -34,9 +35,11 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.postgres",
     "blog",
+    "django_prometheus",
 ]
 
 MIDDLEWARE = [
+    "django_prometheus.middleware.PrometheusBeforeMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -45,6 +48,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "blog.api.middleware.ApiEnvelopeErrorMiddleware",
+    "django_prometheus.middleware.PrometheusAfterMiddleware",
 ]
 
 ROOT_URLCONF = "core.urls"
