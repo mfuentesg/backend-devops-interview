@@ -1,3 +1,4 @@
+import warnings
 from pathlib import Path
 
 import environ
@@ -20,6 +21,9 @@ env = environ.Env(
     POSTGRES_PASSWORD=(str, "postgres"),
     POSTGRES_HOST=(str, "localhost"),
     POSTGRES_PORT=(str, "5432"),
+    LOG_DIR=(str, str(BASE_DIR / "logs")),
+    LOG_JSON_FILE=(bool, False),
+    LOG_LEVEL=(str, ""),  # blank → derived from DEBUG below
 )
 # Read a local .env file if present. Real environment variables always win,
 # so this is a no-op in CI and production.
@@ -92,6 +96,48 @@ AUTH_PASSWORD_VALIDATORS = [
 
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
+
+LOG_LEVEL = env("LOG_LEVEL") or ("DEBUG" if DEBUG else "INFO")
+LOG_DIR = env("LOG_DIR")
+LOG_JSON_FILE = env("LOG_JSON_FILE")
+
+if not DEBUG and LOG_LEVEL == "DEBUG":
+    warnings.warn(
+        "LOG_LEVEL=DEBUG with DEBUG=False: debug-level logging in a non-debug "
+        "deployment is a performance and PII-leak risk.",
+        stacklevel=2,
+    )
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "plain": {"format": "{asctime} {levelname} {name} {message}", "style": "{"},
+        "json": {"()": "core.json_log.JsonFormatter"},
+    },
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "plain"},
+    },
+    "loggers": {
+        name: {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False}
+        for name in ("django", "django.request", "django.server", "blog")
+    },
+    "root": {"handlers": ["console"], "level": LOG_LEVEL},
+}
+
+if LOG_JSON_FILE:
+    Path(LOG_DIR).mkdir(parents=True, exist_ok=True)
+    LOGGING["handlers"]["file"] = {
+        "class": "logging.handlers.RotatingFileHandler",
+        "filename": str(Path(LOG_DIR) / "app.log"),
+        "formatter": "json",
+        "maxBytes": 5 * 1024 * 1024,
+        "backupCount": 3,
+    }
+    for logger in LOGGING["loggers"].values():
+        logger["handlers"].append("file")
+    LOGGING["root"]["handlers"].append("file")
+
 ALLOWED_HOSTS = env("ALLOWED_HOSTS")
 LANGUAGE_CODE = env("LANGUAGE_CODE")
 TIME_ZONE = env("TIME_ZONE")
