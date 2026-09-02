@@ -16,20 +16,30 @@ Steps:
 mise install
 uv sync
 cp .env.example .env                     # config; defaults match docker-compose
-docker compose up -d                     # Postgres :5432, pgAdmin :8080, Prometheus :9090, Grafana :3000, Loki :3100, Alloy :12345
+docker compose up -d                     # the observability + DB stack — see below
 uv run python manage.py migrate
 uv run python manage.py seed
-uv run python manage.py runserver
+uv run python manage.py runserver        # the app runs on the host, not in Compose
 ```
 
-API docs at <http://localhost:8000/api/docs>. pgAdmin at <http://localhost:8080>
-(`admin@example.com` / `postgres`), already connected to the local database.
+API docs at <http://localhost:8000/api/docs>.
 
-Grafana at <http://localhost:3000> (dashboards open anonymously; edit as `admin` /
-`admin`) ships three provisioned dashboards — **PostgreSQL**, **Django** and
-**Logs** — wired to Prometheus, which scrapes `postgres-exporter` and the app's
-`/metrics` endpoint (`django-prometheus`). `runserver` must be up for the Django
-target to report.
+### The Compose stack
+
+`docker compose up -d` brings up seven containers; the Django app itself stays on
+the host (`runserver`, `:8000`), on purpose (editor imports, faster disk).
+
+| Service      | Port    | What it does |
+| ------------ | ------- | ------------ |
+| `postgres`   | `5432`  | App database (`POSTGRES_PORT` maps the host port). |
+| `pgadmin`    | `8080`  | DB admin UI at <http://localhost:8080>, pre-connected to `postgres` (`admin@example.com` / `postgres`). |
+| `prometheus` | `9090`  | Scrapes `pgexporter`, the app's `/metrics`, Loki and Alloy. |
+| `grafana`    | `3000`  | Dashboards at <http://localhost:3000> — **PostgreSQL**, **Django**, **Logs**. Anonymous view; edit as `admin` / `admin`. |
+| `pgexporter` | `9187`  | Postgres metrics for Prometheus. |
+| `loki`       | `3100`  | Log store (bound to `127.0.0.1`). |
+| `alloy`      | `12345` | Tails `logs/app.log` → Loki (bound to `127.0.0.1`). |
+
+Prometheus and the **Django** dashboard only report once `runserver` is up.
 
 **Logging.** The Django app writes structured JSON to `logs/app.log` when
 `LOG_JSON_FILE=True` (the `.env.example` default). Grafana Alloy tails that file and
