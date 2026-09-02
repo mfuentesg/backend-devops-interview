@@ -160,10 +160,13 @@ Volume `loki_data:/loki`.
 ### `monitoring/alloy/config.alloy` (new)
 
 ```alloy
+local.file_match "app" {
+  path_targets = [{ __path__ = "/var/log/app/app.log", job = "django", service = "blog" }]
+  sync_period  = "10s"
+}
+
 loki.source.file "app" {
-  targets = [
-    { __path__ = "/var/log/app/app.log", job = "django", service = "blog" },
-  ]
+  targets    = local.file_match.app.targets
   forward_to = [loki.process.app.receiver]
 }
 
@@ -311,14 +314,14 @@ Prometheus ── scrapes loki:3100/metrics, alloy:12345/metrics
 
 | Case | Behavior |
 | --- | --- |
-| `LOG_JSON_FILE=False` | No file handler, no `logs/` writes. Alloy tails an absent file, logs a warning, picks it up when it appears. |
+| `LOG_JSON_FILE=False` | No file handler, no `logs/` writes. Alloy's `local.file_match` polls the path every `sync_period` (10s) and attaches `loki.source.file` when the file appears — no `docker compose restart alloy` needed on a fresh checkout. |
 | Log rotation | `RotatingFileHandler` renames; Alloy follows by inode and reopens the new file. |
 | Loki down / restarting | Alloy buffers on the `alloy_data` volume (WAL) and retries. Django is unaffected — it only writes a file. |
 | `logs/` owned by root (Compose created it) | Prevented by committing `logs/.gitkeep` so the dir pre-exists. |
 | Label cardinality | Only `job`, `service`, `level`, `logger`. `message`, `module`, `funcName`, paths stay as content. |
 | Event time vs ingest time | `stage.timestamp` parses the formatter's UTC timestamp so panels use event time. |
 | Non-JSON lines in `app.log` (e.g. a stray traceback line) | `stage.json` fails that line's parse; it is still shipped, just without parsed labels. Acceptable. |
-| Tests / CI | `LOG_JSON_FILE` defaults `False`; pytest writes no files, needs no stack. |
+| Tests / CI | `LOG_JSON_FILE` defaults `False`; pytest writes no files, needs no stack. `conftest.py` also does `os.environ.setdefault("LOG_JSON_FILE", "False")` before Django is configured, so the suite still writes nothing after `cp .env.example .env` (which ships `LOG_JSON_FILE=True`). |
 
 ## Testing / verification
 

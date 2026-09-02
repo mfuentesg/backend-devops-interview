@@ -17,4 +17,5 @@
 
 ## Local dev
 
-- Compose runs Postgres and pgAdmin only. The app and its deps run on the host, on purpose.
+- Compose runs Postgres, pgAdmin, and the observability stack (Prometheus, Grafana,
+  exporters, Loki, Alloy); the app and its deps still run on the host, on purpose.

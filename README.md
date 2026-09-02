@@ -26,19 +26,18 @@ API docs at <http://localhost:8000/api/docs>. pgAdmin at <http://localhost:8080>
 (`admin@example.com` / `postgres`), already connected to the local database.
 
 Grafana at <http://localhost:3000> (dashboards open anonymously; edit as `admin` /
-`admin`) ships two provisioned dashboards — **PostgreSQL** and **Django** — wired to
-Prometheus, which scrapes `postgres-exporter` and the app's `/metrics` endpoint
-(`django-prometheus`). `runserver` must be up for the Django target to report.
+`admin`) ships three provisioned dashboards — **PostgreSQL**, **Django** and
+**Logs** — wired to Prometheus, which scrapes `postgres-exporter` and the app's
+`/metrics` endpoint (`django-prometheus`). `runserver` must be up for the Django
+target to report.
 
 **Logging.** The Django app writes structured JSON to `logs/app.log` when
 `LOG_JSON_FILE=True` (the `.env.example` default). Grafana Alloy tails that file and
 ships it to Loki; the provisioned **Logs** dashboard and Explore query it. `runserver`
-must be up for lines to appear. `LOG_LEVEL` defaults to `INFO`; set `DEBUG` for
-verbose app logs — `django.db.backends` and `django.utils.autoreload` stay at `INFO`
-either way. Keep the host app running (or start
-it) around `docker compose up` so `logs/app.log` exists for Alloy to tail — on a
-brand-new checkout where the file is absent, `docker compose restart alloy` once it
-appears picks it up.
+must be up for lines to appear — Alloy polls for the file every 10s and attaches when
+it shows up, so the order you start things in doesn't matter. `LOG_LEVEL` defaults to
+`INFO`; set `DEBUG` for verbose app logs — `django.db.backends`,
+`django.utils.autoreload` and `django.template` stay at `INFO` either way.
 
 Lint and tests:
 

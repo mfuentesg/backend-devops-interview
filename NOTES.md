@@ -116,20 +116,22 @@ I'll use this document to cover two things:
 * Structured logging: `core/json_log.py` renders each `LogRecord` as one JSON
   line; a `RotatingFileHandler` writes `logs/app.log` only when `LOG_JSON_FILE`
   is set, so tests and bare checkouts stay file-free. `LOG_LEVEL` defaults to
-  `INFO` (an explicit value overrides); `django.db.backends` and
-  `django.utils.autoreload` are pinned to `INFO` so a deliberate
-  `LOG_LEVEL=DEBUG` doesn't bury the console in SQL and file-watch noise;
-  `DEBUG=False` + `LOG_LEVEL=DEBUG` warns.
+  `INFO` (an explicit value overrides); `django.db.backends`,
+  `django.utils.autoreload` and `django.template` are pinned to `INFO` so a
+  deliberate `LOG_LEVEL=DEBUG` doesn't bury the console in SQL, file-watch and
+  template-var noise; `DEBUG=False` + `LOG_LEVEL=DEBUG` warns.
 * Log pipeline in `docker-compose.yml`: `grafana/alloy:v1.19.2` tails the
   bind-mounted `logs/app.log`, parses the JSON, promotes `level`/`logger` to
   labels, and pushes to `grafana/loki:3.7.7` (single-binary, filesystem store,
-  7-day retention). Grafana gets a provisioned Loki datasource and a hand-built
-  **Logs** dashboard; Prometheus scrapes both new `/metrics` endpoints.
+  7-day retention). Alloy discovers the file via `local.file_match` (10s poll),
+  so start order doesn't matter and rotation is picked up. Grafana gets a
+  provisioned Loki datasource and a hand-built **Logs** dashboard; Prometheus
+  scrapes both new `/metrics` endpoints.
 
 ## Self taste
 
 * Docker Compose for local development — Postgres, pgAdmin, and the monitoring stack
-  (Prometheus, Grafana, postgres-exporter). One command, no cluster to manage. I
+  (Prometheus, Grafana, postgres-exporter, Loki, Alloy). One command, no cluster to manage. I
   considered skaffold + kind for native k8s manifests with autoreload, but I don't
   think it's needed at this moment. Maybe for a future iteration.
 * `mise`, `uv` and the app run on the host, not in a container. Editor autocomplete and
@@ -175,6 +177,13 @@ I'll use this document to cover two things:
   becomes useful.
 * Drop Alloy's auto `filename` label (`stage.label_drop`) — currently rides along
   on every stream, harmless but unused.
+* The multi-process `RotatingFileHandler` rotation is racy under gunicorn's
+  multiple workers (each worker rotates independently). Switch to stdout logging
+  + platform collection when the production server lands — dissolves both the
+  race and the rotation concern.
+* Bind the rest of the Compose stack's published ports to `127.0.0.1` (postgres,
+  pgexporter, prometheus, grafana, pgadmin — only loki/alloy are localhost-bound
+  so far) and add auth to `/metrics`, with the `DEBUG=False` security work.
 * Load testing for performance validation
 * Race-safe view_count via F("view_count") + 1. Comma-separated expand values. Full-text
   index for the query filter.
