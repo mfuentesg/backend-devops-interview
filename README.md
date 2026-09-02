@@ -56,6 +56,29 @@ ruff check .
 uv run pytest
 ```
 
+### Container image
+
+`Dockerfile` builds a multi-stage `python:3.14-slim` image (uv-resolved venv,
+non-root user, gunicorn on `:8000`, `HEALTHCHECK` on `/api/docs`). CI publishes it
+to `ghcr.io/mfuentesg/backend-devops-interview` on pushes to `main` (`latest`,
+`sha-<sha>`) and on `v*.*.*` tags (semver); PRs build it without pushing.
+
+To run the containerised app against the Compose Postgres, overlay
+`compose.prod.yml` on the infra stack:
+
+```sh
+docker compose -f docker-compose.yml -f compose.prod.yml up --build
+#   migrate runs first; web (gunicorn) waits for it, then serves :8000
+docker compose -f docker-compose.yml -f compose.prod.yml --profile seed run --rm seed
+```
+
+Plain `docker compose up -d` never reads that file, so the host-dev workflow above
+is unaffected. The image needs `SECRET_KEY`, `ALLOWED_HOSTS` and the `POSTGRES_*`
+vars; the overlay wires them from `.env` (or its own defaults). `WEB_PORT`
+overrides the published host port, `WEB_CONCURRENCY` the gunicorn worker count.
+`ADMIN_ENABLED` is `False` in the image — the admin needs a static-file story
+(whitenoise / CDN) before it's useful in a container.
+
 ### Configuration
 
 `core/settings.py` reads its config from environment variables via `django-environ`,

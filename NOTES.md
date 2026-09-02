@@ -66,11 +66,27 @@ I'll use this document to cover two things:
   loop already is. 500 autocommits become 1.
 * Seed goes from ~15-25 min to ~2 min. RNG stream changes, so rows differ but stay
   deterministic under `seed(42)`.
-* Added `.github/workflows/ci.yml`: one `lint-test` job on push to `main` and on PRs,
-  running `ruff check` and `pytest`. `jdx/mise-action` installs python, uv and ruff from
-  `mise.toml`, so CI and local run the exact same pinned tools; uv venv is cached on
-  `uv.lock`. A `build-and-push` job (GHCR image) is scaffolded but commented out until
-  there's a `Dockerfile`.
+* Added `.github/workflows/ci.yml`: a `lint-test` job on push to `main` and on PRs,
+  running `ruff check` and `pytest` against a `postgres:18.6-alpine` service.
+  `jdx/mise-action` installs python, uv and ruff from `mise.toml`, so CI and local
+  run the exact same pinned tools; uv venv is cached on `uv.lock`. A `build-and-push`
+  job builds the image on every PR (no push, just validation) and publishes it to
+  `ghcr.io/<repo>` on `main` (`latest`, `sha-<sha>`) and `v*.*.*` tags (semver),
+  with `docker/metadata-action` tags + GHA layer cache.
+* `Dockerfile`: multi-stage `python:3.14-slim`. Builder resolves the lockfile into a
+  venv with `uv sync --frozen --no-dev` (BuildKit cache mount, deps layer cached
+  separately from the project); runtime stage copies just `/app/.venv`, runs as a
+  non-root user, serves via `gunicorn` (`gthread`, tuned from the env in
+  `gunicorn.conf.py`) on `:8000`, `HEALTHCHECK` on `/api/docs`. ~375 MB.
+  `.dockerignore` keeps the context to what actually serves the app.
+* `compose.prod.yml`: an opt-in overlay that runs the image — `web` (gunicorn),
+  `migrate` (runs first, `web` waits on `service_completed_successfully`), and
+  `seed` behind `--profile seed`. Overlay on `docker-compose.yml`, so plain
+  `docker compose up -d` still starts infra only and the host-dev workflow is intact.
+* `ADMIN_ENABLED` / `ADMIN_URL`: the Django admin route is mounted only when
+  `ADMIN_ENABLED` (default off) and on `ADMIN_URL` (default `backoffice/`, not the
+  scanned `/admin/`). Apps and middleware are untouched — flipping it on needs only
+  the env var plus an auth superuser.
 * `blog/api.py` split into a `blog/api/` package: `posts`, `comments`, `users`, plus
   `responses.py` (envelope builder) and `helpers.py` (exception handlers, pagination,
   shared serializers). One file per entity, thin views, no service layer yet.
@@ -136,7 +152,14 @@ I'll use this document to cover two things:
   think it's needed at this moment. Maybe for a future iteration.
 * `mise`, `uv` and the app run on the host, not in a container. Editor autocomplete and
   imports need the deps local, and the host disk beats a container bind mount (more on
-  macOS). The app still needs an image for production, that's a separate concern.
+  macOS). The production image is a separate concern — `Dockerfile` + `compose.prod.yml`
+  as an opt-in overlay, not folded into the dev `docker compose up`.
+* `gunicorn` with `gthread` workers, not uvicorn — the app is plain WSGI (no async
+  views), and gthread keeps memory flat under this mostly-IO-bound load. Everything
+  tunable lives in `gunicorn.conf.py` reading the env, same as `settings.py`.
+* Admin behind an env flag on a non-default path rather than deleted. It's an empty
+  admin today, but the toggle + `ADMIN_URL` is cheap infrastructure and keeps the
+  scanned `/admin/` closed by default.
 * ruff for linting.
 * Github Actions for CI, running lint and the smoke tests, tools installed via `mise`.
 * Claude as the AI harness.
@@ -164,8 +187,15 @@ I'll use this document to cover two things:
   diff focused.
 * The `DEBUG=False` security block (SSL redirect, secure cookies, HSTS,
   `CSRF_TRUSTED_ORIGINS`) with the deploy work.
-* A production server (gunicorn or uvicorn) and a multi-stage `Dockerfile`, then k8s
-  manifests or an ECS task definition.
+* K8s manifests or an ECS task definition on top of the image — plus pinning the
+  base image by digest, a Trivy scan gate in CI, and gunicorn tuning under load.
+* Admin in a container: `ADMIN_ENABLED` is off in the image because the admin needs
+  a static-file story first (whitenoise or a CDN) — add one if the admin is wanted
+  behind the load balancer.
+* The `RotatingFileHandler` → stdout-JSON switch (below) matters more now that the
+  image runs gunicorn with multiple workers — the file handler is off in the image
+  (`LOG_JSON_FILE=False`), so gunicorn access logs on stdout are the only signal
+  until it lands.
 * Observability: metrics + Grafana dashboards are in; still want Prometheus alert
   rules and swapping the DB engine to
   `django_prometheus.db.backends.postgresql` for `django_db_*` query metrics.

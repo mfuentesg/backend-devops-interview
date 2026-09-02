@@ -19,3 +19,6 @@
 
 - Compose runs Postgres, pgAdmin, and the observability stack (Prometheus, Grafana,
   exporters, Loki, Alloy); the app and its deps still run on the host, on purpose.
+- `Dockerfile` builds the production image; `compose.prod.yml` is an opt-in overlay
+  that runs it (`web` + `migrate` + `seed`) — plain `docker compose up -d` never
+  reads it.
