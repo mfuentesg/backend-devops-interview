@@ -24,6 +24,10 @@ env = environ.Env(
     LOG_DIR=(str, str(BASE_DIR / "logs")),
     LOG_JSON_FILE=(bool, False),
     LOG_LEVEL=(str, ""),  # blank → INFO (resolved below)
+    # Django admin. Off by default; the route is only mounted when enabled, on a
+    # configurable path so the scanned "/admin/" isn't exposed by default.
+    ADMIN_ENABLED=(bool, False),
+    ADMIN_URL=(str, "backoffice/"),
 )
 # Read a local .env file if present. Real environment variables always win,
 # so this is a no-op in CI and production.
@@ -96,6 +100,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
+
+ADMIN_ENABLED = env("ADMIN_ENABLED")
+# Normalise to "<path>/" so "admin", "/admin/" and "admin/" all resolve the same.
+ADMIN_URL = env("ADMIN_URL").strip("/") + "/"
 
 LOG_LEVEL = env("LOG_LEVEL") or "INFO"
 LOG_DIR = env("LOG_DIR")

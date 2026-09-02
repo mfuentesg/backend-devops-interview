@@ -80,6 +80,8 @@ the tracked template; copy it (`cp .env.example .env`) and edit as needed.
 | `LOG_LEVEL`         | `INFO`                                |
 | `LOG_DIR`           | `<repo>/logs`                         |
 | `LOG_JSON_FILE`     | `False` (`.env.example` ships `True`) |
+| `ADMIN_ENABLED`     | `False`                              |
+| `ADMIN_URL`         | `backoffice/` (not `/admin/`)         |
 
 `ALLOWED_HOSTS` ships `*` so the Prometheus container can scrape the host-run app
 via `host.docker.internal`; set explicit hostnames for any real deployment.

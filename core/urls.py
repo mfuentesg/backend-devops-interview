@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.conf import settings
 from django.urls import include, path
 from ninja import NinjaAPI
 
@@ -10,7 +10,13 @@ api.add_router("/", blog_router)
 register_exception_handlers(api)
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
     path("api/", api.urls),
     path("", include("django_prometheus.urls")),
 ]
+
+# Admin is opt-in (ADMIN_ENABLED) and mounted on a configurable, non-default
+# path (ADMIN_URL) so the scanned "/admin/" isn't exposed unless asked for.
+if settings.ADMIN_ENABLED:
+    from django.contrib import admin
+
+    urlpatterns.append(path(settings.ADMIN_URL, admin.site.urls))
