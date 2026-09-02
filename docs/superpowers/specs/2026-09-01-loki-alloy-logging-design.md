@@ -36,8 +36,9 @@ existing monitoring stack:
 | Log sources | Django application only. |
 | Transport | Django writes JSON lines to `logs/app.log`; that dir is bind-mounted read-only into the Alloy container; Alloy tails it with `loki.source.file`. No network coupling between the app and the stack. |
 | Django logging | Human-readable plain text stays on the console (dev ergonomics). A JSON `RotatingFileHandler` is added, attached **only** when `LOG_JSON_FILE` is true. Stdlib only — a small custom `JsonFormatter`, no new dependency. |
-| `LOG_LEVEL` default | Derived from `DEBUG`: `"DEBUG" if DEBUG else "INFO"`. An explicit `LOG_LEVEL` env var overrides. |
-| Alignment guard | At settings load, `not DEBUG and LOG_LEVEL == "DEBUG"` emits a `warnings.warn(...)` — debug logging in a non-debug deployment is a perf / PII risk. |
+| `LOG_LEVEL` default | Flat `"INFO"`. An explicit `LOG_LEVEL` env var overrides. (An earlier revision derived this from `DEBUG`; reverted — pointing the `django` logger at a DEBUG level turns on Django's internal DEBUG firehoses, see below.) |
+| Django firehose loggers | `django.utils.autoreload` and `django.db.backends` are pinned to `INFO` regardless of `LOG_LEVEL` — at DEBUG they emit one line per watched file / per SQL query. A comment says to lower them by hand when debugging SQL. |
+| Alignment guard | At settings load, `not DEBUG and LOG_LEVEL == "DEBUG"` emits a `warnings.warn(...)` — debug logging in a non-debug deployment is a perf / PII risk. Retained even though the default no longer follows `DEBUG`. |
 | Loki deployment | Single-binary, `filesystem` object store, TSDB v13 index, `auth_enabled: false`, 168h (7d) retention with the compactor. No MinIO / rings. |
 | Grafana surface | Provision the Loki datasource **and** a hand-built `logs.json` dashboard. |
 | Alloy / Loki metrics | Added as Prometheus scrape targets (`/metrics`), consistent with the existing exporters. |
@@ -71,25 +72,19 @@ predictable); revisit if needed.
 
 ### `core/settings.py` (modified)
 
-1. Resolve `DEBUG` explicitly *before* the `Env(...)` schema's `LOG_LEVEL` default
-   needs it:
-
-   ```python
-   DEBUG = env.bool("DEBUG", default=True)
-   ```
-
-   Pull `DEBUG` out of the `Env(...)` schema; keep the existing `DEBUG =` line
-   pointing at this value (no behavior change to `DEBUG`).
-
-2. New env vars:
+1. New env vars:
 
    | Var | Default | Notes |
    | --- | --- | --- |
-   | `LOG_LEVEL` | `"DEBUG" if DEBUG else "INFO"` | applies to `django`, `django.request`, `django.server`, `blog`, root |
+   | `LOG_LEVEL` | `"INFO"` (schema entry `(str, "")`, resolved `env("LOG_LEVEL") or "INFO"`) | applies to `django`, `django.request`, `django.server`, `blog`, root |
    | `LOG_DIR` | `str(BASE_DIR / "logs")` | |
    | `LOG_JSON_FILE` | `False` | `.env` / `.env.example` ship `True` |
 
-3. Alignment guard:
+   `DEBUG` still needs to be resolved before the alignment guard runs; the existing
+   `DEBUG = env("DEBUG")` line is enough (no reshuffle required now that the
+   `LOG_LEVEL` default is static).
+
+2. Alignment guard:
 
    ```python
    if not DEBUG and LOG_LEVEL == "DEBUG":
@@ -100,9 +95,9 @@ predictable); revisit if needed.
        )
    ```
 
-4. When `LOG_JSON_FILE`: `Path(LOG_DIR).mkdir(parents=True, exist_ok=True)`.
+3. When `LOG_JSON_FILE`: `Path(LOG_DIR).mkdir(parents=True, exist_ok=True)`.
 
-5. `LOGGING` dict:
+4. `LOGGING` dict:
    - `formatters`: `plain` (human console), `json` (`"()": "core.json_log.JsonFormatter"`)
    - `handlers`:
      - `console` — `logging.StreamHandler`, `plain` (always present)
@@ -112,6 +107,10 @@ predictable); revisit if needed.
    - `loggers`: `django`, `django.request`, `django.server`, `blog` — each at
      `LOG_LEVEL`, handlers `["console"]` (+ `"file"` when `LOG_JSON_FILE`),
      `propagate: False` (so the `root` handlers don't re-emit them).
+   - `loggers` (pinned): `django.db.backends` and `django.utils.autoreload` at a
+     fixed `INFO`, same handlers, `propagate: False` — their DEBUG output is one
+     line per SQL query / per watched file, never wanted just because
+     `LOG_LEVEL=DEBUG`. Inline comment notes how to lower them for SQL debugging.
    - `root`: `LOG_LEVEL`, same handler list — catches every other logger once.
    - `disable_existing_loggers: False`.
 
@@ -263,26 +262,27 @@ Add:
 ```
 # Structured JSON logs to logs/app.log for the Alloy -> Loki pipeline.
 LOG_JSON_FILE=True
-# LOG_LEVEL follows DEBUG (DEBUG -> DEBUG, else INFO) unless set explicitly.
+# Root/app log level. Defaults to INFO; set DEBUG for verbose app logs
+# (django.db.backends and django.utils.autoreload stay at INFO regardless).
 # LOG_LEVEL=INFO
 ```
 
-`.env.example` ships no active `LOG_LEVEL` line so the derived default shows through.
+`.env.example` ships no active `LOG_LEVEL` line so the `INFO` default shows through.
 
 ### `README.md` (modified)
 
 - Loki + Alloy in the stack list and the port comment.
 - A short **Logging** subsection: JSON to `logs/app.log`, tailed by Alloy into Loki,
   visible in Grafana; `runserver` with `LOG_JSON_FILE=True` feeds it.
-- Config-table rows for `LOG_LEVEL` (note the derived default), `LOG_DIR`,
-  `LOG_JSON_FILE`.
+- Config-table rows for `LOG_LEVEL` (default `INFO`), `LOG_DIR`, `LOG_JSON_FILE`.
 
 ### `NOTES.md` (modified)
 
 Logbook framing — describe the added capability as design, not a fix narrative:
 
-- New entry: the JSON logging config, the Alloy → Loki pipeline, the provisioned
-  datasource + Logs dashboard, the `DEBUG`/`LOG_LEVEL` alignment.
+- New entry: the JSON logging config (INFO default, Django DEBUG firehoses pinned,
+  the `DEBUG=False`+`LOG_LEVEL=DEBUG` guard), the Alloy → Loki pipeline, the
+  provisioned datasource + Logs dashboard.
 - Drop the "still want Loki for logs" line from "What I'd do next".
 - Add follow-ups: container-log collection via `loki.source.docker`, correlation
   IDs, Loki ruler + log-based alerts, `extra`-field serialization in the formatter.

@@ -13,7 +13,9 @@
 ## Global Constraints
 
 - Conventional Commits (`type(scope): summary`). No `Co-Authored-By: Claude` trailer.
-- All settings come from the environment via `django-environ`; static defaults live in the `Env(...)` schema. `LOG_LEVEL` is the one exception — its default is derived from `DEBUG`, so its schema entry is `(str, "")` with the derived fallback applied in code.
+- All settings come from the environment via `django-environ`; static defaults live in the `Env(...)` schema. `LOG_LEVEL`'s schema entry is `(str, "")` with the fallback `env("LOG_LEVEL") or "INFO"` applied in code (a blank env value resolves to `INFO`). `django.db.backends` and `django.utils.autoreload` are pinned to `INFO` in `LOGGING` regardless of `LOG_LEVEL` — their DEBUG output is a per-query / per-file firehose.
+
+  > **Revision note:** an earlier version of this plan derived `LOG_LEVEL` from `DEBUG` (`"DEBUG" if DEBUG else "INFO"`). That was reversed after `runserver` verification: pointing the `django` logger at DEBUG turns on Django's internal DEBUG logging (every SQL query, every watched file). The `not DEBUG and LOG_LEVEL == "DEBUG"` warning guard is kept. Task 1's committed code and the doc tasks were fixed in a follow-up commit; the code blocks below reflect the corrected design.
 - Keep `.env.example` in sync with any new env var. Dev defaults stay obviously fake. Never commit a real `.env` (it is git-ignored).
 - Compose runs infra only; the Django app and its deps run on the host. Do not containerize the app.
 - All container images pinned to an exact tag. No `latest`.
@@ -162,13 +164,13 @@ Add three entries to the `Env(...)` schema, after `POSTGRES_PORT`:
 ```python
     LOG_DIR=(str, str(BASE_DIR / "logs")),
     LOG_JSON_FILE=(bool, False),
-    LOG_LEVEL=(str, ""),  # blank → derived from DEBUG below
+    LOG_LEVEL=(str, ""),  # blank → INFO (resolved below)
 ```
 
 After the existing `DEBUG = env("DEBUG")` line, add:
 
 ```python
-LOG_LEVEL = env("LOG_LEVEL") or ("DEBUG" if DEBUG else "INFO")
+LOG_LEVEL = env("LOG_LEVEL") or "INFO"
 LOG_DIR = env("LOG_DIR")
 LOG_JSON_FILE = env("LOG_JSON_FILE")
 
@@ -178,6 +180,18 @@ if not DEBUG and LOG_LEVEL == "DEBUG":
         "deployment is a performance and PII-leak risk.",
         stacklevel=2,
     )
+
+# django.db.backends / django.utils.autoreload are firehoses at DEBUG (one
+# line per SQL query / per watched file). Pin them to INFO so an explicit
+# LOG_LEVEL=DEBUG stays readable — lower "django.db.backends" by hand for SQL.
+_LOGGER_LEVELS = {
+    "django": LOG_LEVEL,
+    "django.request": LOG_LEVEL,
+    "django.server": LOG_LEVEL,
+    "blog": LOG_LEVEL,
+    "django.db.backends": "INFO",
+    "django.utils.autoreload": "INFO",
+}
 
 LOGGING = {
     "version": 1,
@@ -190,8 +204,8 @@ LOGGING = {
         "console": {"class": "logging.StreamHandler", "formatter": "plain"},
     },
     "loggers": {
-        name: {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False}
-        for name in ("django", "django.request", "django.server", "blog")
+        name: {"handlers": ["console"], "level": level, "propagate": False}
+        for name, level in _LOGGER_LEVELS.items()
     },
     "root": {"handlers": ["console"], "level": LOG_LEVEL},
 }
@@ -229,8 +243,13 @@ Then delete the stray file: `rm -rf logs/app.log`
 
 ```bash
 git add core/json_log.py blog/tests/test_logging.py core/settings.py
-git commit -m "feat(logging): structured JSON logging with a DEBUG-aligned level"
+git commit -m "feat(logging): structured JSON logging with an env-driven level"
 ```
+
+> Historical note: this task originally shipped as `feat(logging): structured JSON
+> logging with a DEBUG-aligned level` (`8426b77`), then `fix(logging): default
+> LOG_LEVEL to INFO and mute Django's DEBUG firehoses` (`b55c2a5`) after
+> `runserver` verification. The code above is the corrected end state.
 
 ---
 
@@ -273,7 +292,8 @@ Add, after the `TIME_ZONE` block (keep the file's comment style):
 ```
 # Structured JSON logs to logs/app.log, tailed by Alloy into Loki.
 LOG_JSON_FILE=True
-# LOG_LEVEL follows DEBUG (True -> DEBUG, False -> INFO) unless set explicitly.
+# Root/app log level. Defaults to INFO; set DEBUG for verbose app logs
+# (django.db.backends and django.utils.autoreload stay at INFO regardless).
 # LOG_LEVEL=INFO
 ```
 
@@ -614,12 +634,12 @@ git commit -m "feat(monitoring): hand-built Logs dashboard on Loki"
   > The Django app writes structured JSON to `logs/app.log` when `LOG_JSON_FILE=True`
   > (the `.env.example` default). Grafana Alloy tails that file and ships it to Loki;
   > the provisioned **Logs** dashboard and Explore query it. `runserver` must be up
-  > for lines to appear. `LOG_LEVEL` follows `DEBUG` (→ `DEBUG` when `DEBUG=True`,
-  > else `INFO`) unless set explicitly.
+  > for lines to appear. `LOG_LEVEL` defaults to `INFO`; set `DEBUG` for verbose app
+  > logs — `django.db.backends` and `django.utils.autoreload` stay at `INFO` either way.
 
 - Add rows to the config table:
 
-  | `LOG_LEVEL`     | follows `DEBUG` (`DEBUG`/`INFO`) |
+  | `LOG_LEVEL`     | `INFO`                          |
   | `LOG_DIR`       | `<repo>/logs`                    |
   | `LOG_JSON_FILE` | `False` (`.env.example` ships `True`) |
 
