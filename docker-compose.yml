@@ -37,6 +37,33 @@ services:
       - "--storage.tsdb.path=/prometheus"
     restart: unless-stopped
 
+  loki:
+    image: grafana/loki:3.7.7
+    command: -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml
+      - loki_data:/loki
+    restart: unless-stopped
+
+  alloy:
+    image: grafana/alloy:v1.19.2
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    ports:
+      - "12345:12345"
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ./logs:/var/log/app:ro
+      - alloy_data:/var/lib/alloy/data
+    depends_on:
+      - loki
+    restart: unless-stopped
+
   grafana:
     image: grafana/grafana:13.2.1
     container_name: grafana_ui
@@ -56,6 +83,7 @@ services:
       - ./monitoring/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
+      - loki
     restart: unless-stopped
 
   pgadmin:
@@ -89,6 +117,8 @@ volumes:
   pgadmin_data:
   prometheus_data:
   grafana_data:
+  loki_data:
+  alloy_data:
 
 # Plain strings built inline from Docker Config blocks. Compose interpolates
 # ${VAR} here at parse time, reading the project .env (real env vars win).

@@ -1,0 +1,36 @@
+loki.source.file "app" {
+  targets = [
+    { __path__ = "/var/log/app/app.log", job = "django", service = "blog" },
+  ]
+  forward_to = [loki.process.app.receiver]
+}
+
+loki.process "app" {
+  stage.json {
+    expressions = {
+      level  = "level",
+      logger = "logger",
+      ts     = "timestamp",
+    }
+  }
+
+  stage.timestamp {
+    source = "ts"
+    format = "RFC3339Nano"
+  }
+
+  stage.labels {
+    values = {
+      level  = "level",
+      logger = "logger",
+    }
+  }
+
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
