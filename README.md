@@ -33,8 +33,9 @@ Prometheus, which scrapes `postgres-exporter` and the app's `/metrics` endpoint
 **Logging.** The Django app writes structured JSON to `logs/app.log` when
 `LOG_JSON_FILE=True` (the `.env.example` default). Grafana Alloy tails that file and
 ships it to Loki; the provisioned **Logs** dashboard and Explore query it. `runserver`
-must be up for lines to appear. `LOG_LEVEL` follows `DEBUG` (→ `DEBUG` when
-`DEBUG=True`, else `INFO`) unless set explicitly. Keep the host app running (or start
+must be up for lines to appear. `LOG_LEVEL` defaults to `INFO`; set `DEBUG` for
+verbose app logs — `django.db.backends` and `django.utils.autoreload` stay at `INFO`
+either way. Keep the host app running (or start
 it) around `docker compose up` so `logs/app.log` exists for Alloy to tail — on a
 brand-new checkout where the file is absent, `docker compose restart alloy` once it
 appears picks it up.
@@ -67,7 +68,7 @@ the tracked template; copy it (`cp .env.example .env`) and edit as needed.
 | `POSTGRES_PASSWORD` | `postgres`                            |
 | `POSTGRES_HOST`     | `localhost`                           |
 | `POSTGRES_PORT`     | `5432`                                |
-| `LOG_LEVEL`         | follows `DEBUG` (`DEBUG`/`INFO`)      |
+| `LOG_LEVEL`         | `INFO`                                |
 | `LOG_DIR`           | `<repo>/logs`                         |
 | `LOG_JSON_FILE`     | `False` (`.env.example` ships `True`) |
 

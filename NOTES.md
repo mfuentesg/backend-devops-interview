@@ -115,8 +115,10 @@ I'll use this document to cover two things:
     in Grafana.
 * Structured logging: `core/json_log.py` renders each `LogRecord` as one JSON
   line; a `RotatingFileHandler` writes `logs/app.log` only when `LOG_JSON_FILE`
-  is set, so tests and bare checkouts stay file-free. `LOG_LEVEL` derives from
-  `DEBUG` (`DEBUG`→`DEBUG`, else `INFO`); an explicit value overrides, and
+  is set, so tests and bare checkouts stay file-free. `LOG_LEVEL` defaults to
+  `INFO` (an explicit value overrides); `django.db.backends` and
+  `django.utils.autoreload` are pinned to `INFO` so a deliberate
+  `LOG_LEVEL=DEBUG` doesn't bury the console in SQL and file-watch noise;
   `DEBUG=False` + `LOG_LEVEL=DEBUG` warns.
 * Log pipeline in `docker-compose.yml`: `grafana/alloy:v1.19.2` tails the
   bind-mounted `logs/app.log`, parses the JSON, promotes `level`/`logger` to

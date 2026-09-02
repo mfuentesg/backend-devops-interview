@@ -23,7 +23,7 @@ env = environ.Env(
     POSTGRES_PORT=(str, "5432"),
     LOG_DIR=(str, str(BASE_DIR / "logs")),
     LOG_JSON_FILE=(bool, False),
-    LOG_LEVEL=(str, ""),  # blank → derived from DEBUG below
+    LOG_LEVEL=(str, ""),  # blank → INFO (resolved below)
 )
 # Read a local .env file if present. Real environment variables always win,
 # so this is a no-op in CI and production.
