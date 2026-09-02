@@ -2,6 +2,8 @@ import json
 import logging
 import sys
 
+from django.conf import settings
+
 from core.json_log import JsonFormatter
 
 
@@ -38,3 +40,9 @@ def test_format_includes_exception_when_exc_info_present():
         record = _record(exc_info=sys.exc_info())
     data = json.loads(JsonFormatter().format(record))
     assert "ValueError: boom" in data["exception"]
+
+
+def test_log_level_defaults_to_info_and_django_firehoses_are_muted():
+    assert settings.LOG_LEVEL == "INFO"
+    assert settings.LOGGING["loggers"]["django.utils.autoreload"]["level"] == "INFO"
+    assert settings.LOGGING["loggers"]["django.db.backends"]["level"] == "INFO"

@@ -97,7 +97,7 @@ AUTH_PASSWORD_VALIDATORS = [
 SECRET_KEY = env("SECRET_KEY")
 DEBUG = env("DEBUG")
 
-LOG_LEVEL = env("LOG_LEVEL") or ("DEBUG" if DEBUG else "INFO")
+LOG_LEVEL = env("LOG_LEVEL") or "INFO"
 LOG_DIR = env("LOG_DIR")
 LOG_JSON_FILE = env("LOG_JSON_FILE")
 
@@ -119,8 +119,25 @@ LOGGING = {
         "console": {"class": "logging.StreamHandler", "formatter": "plain"},
     },
     "loggers": {
-        name: {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False}
-        for name in ("django", "django.request", "django.server", "blog")
+        # Django's internal DEBUG logging is a firehose (every SQL query via
+        # django.db.backends; every watched file via django.utils.autoreload).
+        # Pin those two above LOG_LEVEL so an explicit LOG_LEVEL=DEBUG still
+        # yields a readable console — lower them by hand when debugging SQL.
+        name: {
+            "handlers": ["console"],
+            "level": "INFO"
+            if name in ("django.db.backends", "django.utils.autoreload")
+            else LOG_LEVEL,
+            "propagate": False,
+        }
+        for name in (
+            "django",
+            "django.request",
+            "django.server",
+            "django.db.backends",
+            "django.utils.autoreload",
+            "blog",
+        )
     },
     "root": {"handlers": ["console"], "level": LOG_LEVEL},
 }
