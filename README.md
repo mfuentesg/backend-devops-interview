@@ -53,6 +53,13 @@ the tracked template; copy it (`cp .env.example .env`) and edit as needed.
 | `POSTGRES_HOST`     | `localhost`                |
 | `POSTGRES_PORT`     | `5432`                     |
 
+`docker-compose.yml` also reads `.env`: `POSTGRES_DB` / `POSTGRES_USER` /
+`POSTGRES_PASSWORD` seed the Postgres container plus pgAdmin's pre-registered
+connection (`servers.json` + `pgpass`), `POSTGRES_PORT` maps the published host
+port, and `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` (defaults
+`admin@example.com` / `postgres`) are the pgAdmin login. pgAdmin reaches Postgres
+over the Compose network as `postgres:5432` regardless of the host settings.
+
 Any real deployment must set its own `SECRET_KEY` (generate one with
 `uv run python -c "from django.core.management.utils import get_random_secret_key as g; print(g())"`).
 

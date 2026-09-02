@@ -32,6 +32,16 @@ I'll use this document to cover two things:
 * Added `docker-compose.yml` for the database: `postgres:18.6-alpine` with a persistent
   volume and the db created on boot, plus `pgadmin` on `:8080` already wired through Docker
   `configs`. One command replaces the "install Postgres yourself" step.
+* `docker-compose.yml` now reads `.env` via Compose's own `${VAR}` interpolation
+  (auto-loads the project `.env`, real env vars win). `POSTGRES_DB/USER/PASSWORD`
+  feed the Postgres container *and* get baked into the pgAdmin `servers.json` +
+  `pgpass` config blocks, so one set of creds drives everything and pgAdmin's
+  pre-registered connection can't drift. `POSTGRES_PORT` maps the published host
+  port; `PGADMIN_DEFAULT_EMAIL/PASSWORD` added to `.env.example`. `Host`/`Port`
+  in `servers.json` stay literal `postgres:5432` — that's the Compose-network
+  address, not the host's `POSTGRES_HOST/PORT`. All defaulted (`${VAR:-default}`),
+  so `.env` stays optional. pgAdmin does no env substitution itself; this is
+  purely Compose. Verified with `docker compose config`.
 * `core/settings.py` reads its config from env vars via `django-environ`: `SECRET_KEY`,
   `LANGUAGE_CODE`, `TIME_ZONE`, and the DB connection (`POSTGRES_DB`, `POSTGRES_USER`,
   `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_PORT`). Old values stay as defaults, so
