@@ -1,7 +1,7 @@
 import html
 import re
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 
 import nh3
 from ninja import Schema
@@ -137,7 +137,7 @@ class Envelope[T](Schema):
     errors: list[ErrorItem] = []
 
 
-class SortOrder(str, Enum):
+class SortOrder(StrEnum):
     asc = "asc"
     desc = "desc"
 
@@ -149,5 +149,5 @@ class PostFilters(Schema):
     slug: str | None = None
 
 
-class Expandable(str, Enum):
+class Expandable(StrEnum):
     comments = "comments"
