@@ -38,11 +38,17 @@ def test_format_includes_exception_when_exc_info_present():
         raise ValueError("boom")
     except ValueError:
         record = _record(exc_info=sys.exc_info())
-    data = json.loads(JsonFormatter().format(record))
+    formatted = JsonFormatter().format(record)
+    assert "\n" not in formatted  # one physical line per record — the file-tail invariant
+    data = json.loads(formatted)
     assert "ValueError: boom" in data["exception"]
 
 
-def test_log_level_defaults_to_info_and_django_firehoses_are_muted():
-    assert settings.LOG_LEVEL == "INFO"
-    assert settings.LOGGING["loggers"]["django.utils.autoreload"]["level"] == "INFO"
-    assert settings.LOGGING["loggers"]["django.db.backends"]["level"] == "INFO"
+def test_django_firehose_loggers_are_pinned_to_info():
+    # Regardless of LOG_LEVEL (a dev may set LOG_LEVEL=DEBUG in their .env), the
+    # firehose loggers stay at INFO — one line per SQL query / watched file /
+    # unresolved template var otherwise.
+    loggers = settings.LOGGING["loggers"]
+    assert loggers["django.db.backends"]["level"] == "INFO"
+    assert loggers["django.utils.autoreload"]["level"] == "INFO"
+    assert loggers["django.template"]["level"] == "INFO"

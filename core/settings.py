@@ -120,13 +120,15 @@ LOGGING = {
     },
     "loggers": {
         # Django's internal DEBUG logging is a firehose (every SQL query via
-        # django.db.backends; every watched file via django.utils.autoreload).
-        # Pin those two above LOG_LEVEL so an explicit LOG_LEVEL=DEBUG still
-        # yields a readable console — lower them by hand when debugging SQL.
+        # django.db.backends; every watched file via django.utils.autoreload;
+        # every unresolved template var via django.template). Pin those above
+        # LOG_LEVEL so an explicit LOG_LEVEL=DEBUG still yields a readable
+        # console — lower them by hand when debugging. The list isn't
+        # exhaustive; add others here if a new firehose shows up.
         name: {
             "handlers": ["console"],
             "level": "INFO"
-            if name in ("django.db.backends", "django.utils.autoreload")
+            if name in ("django.db.backends", "django.utils.autoreload", "django.template")
             else LOG_LEVEL,
             "propagate": False,
         }
@@ -136,6 +138,7 @@ LOGGING = {
             "django.server",
             "django.db.backends",
             "django.utils.autoreload",
+            "django.template",
             "blog",
         )
     },
@@ -150,6 +153,7 @@ if LOG_JSON_FILE:
         "formatter": "json",
         "maxBytes": 5 * 1024 * 1024,
         "backupCount": 3,
+        "encoding": "utf-8",
     }
     for logger in LOGGING["loggers"].values():
         logger["handlers"].append("file")

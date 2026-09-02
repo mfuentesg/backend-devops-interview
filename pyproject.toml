@@ -28,5 +28,5 @@ extend-exclude = ["*/migrations/*"]
 select = ["E", "F", "I", "UP", "B"]
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "core.settings"
+DJANGO_SETTINGS_MODULE = "core.settings_test"
 python_files = ["test_*.py"]
