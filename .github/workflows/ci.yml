@@ -3,12 +3,12 @@ name: CI
 on:
     push:
         branches: [main]
+        tags: ["v*.*.*"]
     pull_request:
         types: [opened, synchronize]
 
 permissions:
     contents: read
-    packages: write
 
 jobs:
     lint-test:
@@ -56,35 +56,48 @@ jobs:
             - name: Run tests
               run: uv run pytest -vv
 
-    # This step can be included in case of building image directly in pipeline
-    # build-and-push:
-    #     name: Build & Push Image
-    #     runs-on: ubuntu-latest
-    #     needs: [lint-test]
-    #     if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
-    #     permissions:
-    #         contents: read
-    #         packages: write
-    #     steps:
-    #         - name: Checkout repository
-    #           uses: actions/checkout@v5
+    build-and-push:
+        name: build image
+        runs-on: ubuntu-latest
+        needs: [lint-test]
+        permissions:
+            contents: read
+            packages: write
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v5
 
-    #         - name: Log in to GitHub Container Registry
-    #           uses: docker/login-action@v3
-    #           with:
-    #               registry: ghcr.io
-    #               username: ${{ github.actor }}
-    #               password: ${{ secrets.GITHUB_TOKEN }}
+            - name: Set up Buildx
+              uses: docker/setup-buildx-action@v4
 
-    #         - name: Build and push Docker image
-    #           uses: docker/build-push-action@v5
-    #           with:
-    #               file: Dockerfile
-    #               push: true
-    #               no-cache: true
-    #               tags: |
-    #                   ghcr.io/backend-devops-interview:sha-${{ github.sha }}
-    #                   ghcr.io/backend-devops-interview:latest
-    #               labels: |
-    #                   org.opencontainers.image.source=${{ github.repositoryUrl }}
-    #                   org.opencontainers.image.revision=${{ github.sha }}
+            # Push only on pushes to main / version tags; PRs build to validate
+            # the Dockerfile and stop there.
+            - name: Log in to GHCR
+              if: github.event_name == 'push'
+              uses: docker/login-action@v4
+              with:
+                  registry: ghcr.io
+                  username: ${{ github.actor }}
+                  password: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Image metadata
+              id: meta
+              uses: docker/metadata-action@v6
+              with:
+                  images: ghcr.io/${{ github.repository }}
+                  tags: |
+                      type=ref,event=branch
+                      type=ref,event=pr
+                      type=sha,prefix=sha-
+                      type=semver,pattern={{version}}
+                      type=raw,value=latest,enable={{is_default_branch}}
+
+            - name: Build and push
+              uses: docker/build-push-action@v7
+              with:
+                  context: .
+                  push: ${{ github.event_name == 'push' }}
+                  tags: ${{ steps.meta.outputs.tags }}
+                  labels: ${{ steps.meta.outputs.labels }}
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
