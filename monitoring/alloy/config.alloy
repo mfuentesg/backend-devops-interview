@@ -1,7 +1,10 @@
+local.file_match "app" {
+  path_targets = [{ __path__ = "/var/log/app/app.log", job = "django", service = "blog" }]
+  sync_period  = "10s"
+}
+
 loki.source.file "app" {
-  targets = [
-    { __path__ = "/var/log/app/app.log", job = "django", service = "blog" },
-  ]
+  targets    = local.file_match.app.targets
   forward_to = [loki.process.app.receiver]
 }
 

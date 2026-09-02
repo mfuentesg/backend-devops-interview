@@ -41,9 +41,9 @@ services:
     image: grafana/loki:3.7.7
     command: -config.file=/etc/loki/loki-config.yml
     ports:
-      - "3100:3100"
+      - "127.0.0.1:3100:3100"
     volumes:
-      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - loki_data:/loki
     restart: unless-stopped
 
@@ -55,7 +55,7 @@ services:
       - --storage.path=/var/lib/alloy/data
       - /etc/alloy/config.alloy
     ports:
-      - "12345:12345"
+      - "127.0.0.1:12345:12345"
     volumes:
       - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
       - ./logs:/var/log/app:ro
@@ -87,7 +87,7 @@ services:
     restart: unless-stopped
 
   pgadmin:
-    image: dpage/pgadmin4:latest
+    image: dpage/pgadmin4:9.17
     container_name: pgadmin_ui
     restart: always
     environment:
